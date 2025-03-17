@@ -1,0 +1,132 @@
+name: Arcade Workflow
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  MIRROR_URL: "git@github.com:EpitechPromo2028/B-OOP-400-LIL-4-1-arcade-alexandre.garbe.git"
+  PROJECT_NAME: "Arcade"
+  PUSH_BRANCH: "${{ github.ref }}"
+  PUSHER: "${{ github.actor }}"
+  REPOSITORY: "${{ github.repository }}"
+
+jobs:
+  is_repo_a_mirror:
+    runs-on: ubuntu-latest
+    if: github.repository != 'git@github.com:EpitechPromo2028/B-OOP-400-LIL-4-1-arcade-alexandre.garbe.git'
+    steps:
+      - name: Check if repo is a mirror
+        run: |
+          if [[ "${GITHUB_REPOSITORY}" == "${MIRROR_URL}" ]]; then
+            echo "Error: This repository is a mirror"
+            exit 1
+          else
+            echo "This repository is not a mirror"
+            exit 0
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: is_repo_a_mirror
+    container:
+      image: epitechcontent/epitest-docker:latest
+      options: --privileged
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache
+          key: ${{ runner.os }}-build-${{ hashFiles('**/lockfiles') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+      - name: Build
+        run: make
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.repository != 'git@github.com:EpitechPromo2028/B-OOP-400-LIL-4-1-arcade-alexandre.garbe.git' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push to Mirror
+        uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url: ${{ env.MIRROR_URL }}
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+  discord_report:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Format workflow conclusion
+        id: conclusion
+        run: |
+          BUILD_STATUS="${{ needs.build.result }}"
+          DEPLOY_STATUS="${{ needs.deploy.result }}"
+
+          if [ "$BUILD_STATUS" == "failure" ]; then
+            BUILD_STATUS="❌ Failed"
+          else
+            BUILD_STATUS="✅ Success"
+          fi
+
+          if [ "$DEPLOY_STATUS" == "failure" ]; then
+            DEPLOY_STATUS="❌ Failed"
+          else
+            DEPLOY_STATUS="✅ Success"
+          fi
+
+          if [ "$BUILD_STATUS" == "❌ Failed" ] || [ "$DEPLOY_STATUS" == "❌ Failed" ]; then
+            EMBED_COLOR="15158332"
+            WORKFLOW_STATUS="❌ Failed"
+          else
+            EMBED_COLOR="3066993"
+            WORKFLOW_STATUS="✅ Success"
+          fi
+          
+          echo "build_status=${BUILD_STATUS}" >> $GITHUB_ENV
+          echo "deploy_status=${DEPLOY_STATUS}" >> $GITHUB_ENV
+          echo "workflow_status=${WORKFLOW_STATUS}" >> $GITHUB_ENV
+          echo "embed_color=${EMBED_COLOR}" >> $GITHUB_ENV
+
+      - name: Get Commit Messages
+        id: commits
+        run: |
+          COMMIT_MESSAGES=$(git log -1 --pretty=format:"%h - %s (%an)")
+          echo "commit_messages=${COMMIT_MESSAGES}" >> $GITHUB_ENV
+
+      - name: Send Discord Notification
+        uses: tsickert/discord-webhook@v6.0.0
+        with:
+          webhook-url: ${{ secrets.WEBHOOK_URL }}
+          embed-title: "Workflow Report - ${{ env.PROJECT_NAME }}"
+          embed-description: |
+            **Workflow Status**: `${{ env.workflow_status }}`
+            **Build**: `${{ env.build_status }}`
+            **Deployment**: `${{ env.deploy_status }}`
+
+            **Branch**: `${{ env.PUSH_BRANCH }}`
+            **Pusher**: `${{ env.PUSHER }}`
+            **Repository**: `${{ env.REPOSITORY }}`
+
+            **Commits**:
+            `${{ env.commit_messages }}`
+
+            _This report was generated automatically by GitHub Actions._
+          embed-color: ${{ env.embed_color }}
+          embed-image-url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
