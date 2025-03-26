@@ -1,14 +1,28 @@
 /*
 ** EPITECH PROJECT, 2025
-** Arcade-Public
+** Arcade
 ** File description:
-** Main
+** Main entry point
 */
 
 #include <iostream>
+#include <string>
+#include "ArcadeCore.hpp"
 
-int main()
+int main(int argc, char **argv)
 {
-    std::cout << "Hello, World!" << std::endl;
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <graphics_library.so>" << std::endl;
+        return 84;
+    }
+
+    try {
+        arcd::ArcadeCore core(argv[1]); // segfault ici
+        core.run();
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 84;
+    }
+
     return 0;
 }
