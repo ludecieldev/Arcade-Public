@@ -17,9 +17,8 @@ namespace arcd {
           menu(std::make_unique<Menu>()),
           isRunning(true)
     {
-        // segfault here
         try {
-            graphicsManager->loadLibrary(initialGraphicsLib); // here
+            graphicsManager->loadLibrary(initialGraphicsLib); // segfault here
         } catch (const std::exception &e) {
             throw std::runtime_error("Failed to load initial graphics library: " + std::string(e.what()));
         }
