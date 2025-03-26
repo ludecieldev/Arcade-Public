@@ -26,8 +26,8 @@ namespace arcd {
             DLLoader<IGraphicsModule> loader(path);
             currentModule = loader.getInstance();
 
-            if (!currentModule) // segfault ici à cause du throw, mauvaise gestion de base de currentmodule donc dans mon dlloader?
-                throw std::runtime_error("Library does not provide a valid graphics module");
+            // if (!currentModule) // segfault ici à cause du throw, mauvaise gestion de base de currentmodule donc dans mon dlloader?
+            //     throw std::runtime_error("Library does not provide a valid graphics module");
 
             currentLibraryPath = path;
             const std::vector<std::string> &libraries = libraryManager->getAvailableGraphicsLibraries();
