@@ -80,6 +80,8 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
     // Unload current library if any
     unloadCurrentGraphicsLibrary();
     
+    std::cerr << "DEBUG: Attempting to load graphics library: " << name << std::endl;
+    
     // Find the library path
     std::string path;
     if (_graphicsLibs.find(name) != _graphicsLibs.end()) {
@@ -89,28 +91,39 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
         path = name;
     }
     
+    std::cerr << "DEBUG: Using path: " << path << std::endl;
+    
     // Load the library
     if (!_loader->load(path)) {
         _lastError = "Failed to load graphics library: " + _loader->getError();
+        std::cerr << "DEBUG: " << _lastError << std::endl;
         return false;
     }
+    
+    std::cerr << "DEBUG: Library loaded successfully" << std::endl;
     
     // Get the create function
     void* createSymbol = _loader->getSymbol("createGraphicsLibrary");
     if (!createSymbol) {
         _lastError = "Invalid graphics library: " + _loader->getError();
+        std::cerr << "DEBUG: " << _lastError << std::endl;
         _loader->unload();
         return false;
     }
+    
+    std::cerr << "DEBUG: Found createGraphicsLibrary symbol" << std::endl;
     
     // Create the graphics library instance
     auto createFunc = reinterpret_cast<create_graphics_t>(createSymbol);
     _currentGraphicsLib = createFunc();
     if (!_currentGraphicsLib) {
         _lastError = "Failed to create graphics library instance";
+        std::cerr << "DEBUG: " << _lastError << std::endl;
         _loader->unload();
         return false;
     }
+    
+    std::cerr << "DEBUG: Graphics library instance created successfully" << std::endl;
     
     _currentGraphicsLibPath = path;
     return true;
@@ -118,6 +131,12 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
 
 IGraphicsLibrary* LibraryManager::getCurrentGraphicsLibrary() const
 {
+    std::cerr << "DEBUG: LibraryManager::getCurrentGraphicsLibrary() called" << std::endl;
+    if (_currentGraphicsLib) {
+        std::cerr << "DEBUG: Returning valid graphics library pointer" << std::endl;
+    } else {
+        std::cerr << "DEBUG: Warning: Returning null graphics library pointer" << std::endl;
+    }
     return _currentGraphicsLib;
 }
 

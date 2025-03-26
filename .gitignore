@@ -4,3 +4,7 @@ save
 .vscode
 .vscode/
 .vscode/*
+lib/*
+lib/
+lib
+arcade

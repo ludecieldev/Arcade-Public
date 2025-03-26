@@ -17,15 +17,15 @@ CORE_OBJ = $(CORE_SRC:.cpp=.o)
 CORE_NAME = arcade
 
 # Game sources
-GAME_SRC =  # Add more game sources here
-GAME_LIBS = $(GAME_SRC:.cpp=.so)
+GAME_SRC = # Add game sources here
+GAME_LIBS = $(patsubst src/games/%.cpp,lib/arcade_%.so,$(GAME_SRC))
 
 # Graphics sources
-GRAPHICS_SRC = # Add more graphics sources here
-GRAPHICS_LIBS = $(GRAPHICS_SRC:.cpp=.so)
+GRAPHICS_SRC = src/graphics/NcursesGraphics.cpp
+GRAPHICS_LIBS = $(patsubst src/graphics/%.cpp,lib/arcade_%.so,$(GRAPHICS_SRC))
 
 CXX = g++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC
+CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC -fno-gnu-unique
 LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system -lncurses -lSDL2
 
 # Colors for output
@@ -48,14 +48,16 @@ $(CORE_NAME): $(CORE_OBJ)
 
 games: $(GAME_LIBS)
 
-%.so: %.cpp
-	@$(CXX) $(CXXFLAGS) -shared -o $@ $<
+lib/arcade_%.so: src/games/%.cpp
+	@mkdir -p lib
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
 	@echo -e "${GREEN}Game library built: $@${NC}"
 
 graphics: $(GRAPHICS_LIBS)
 
-%.so: %.cpp
-	@$(CXX) $(CXXFLAGS) -shared -o $@ $<
+lib/arcade_%.so: src/graphics/%.cpp
+	@mkdir -p lib
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
 	@echo -e "${GREEN}Graphics library built: $@${NC}"
 
 clean:

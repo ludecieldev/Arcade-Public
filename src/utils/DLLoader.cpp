@@ -6,6 +6,7 @@
 */  
 
 #include "utils/DLLoader.hpp"
+#include <iostream>
 
 namespace arcd {
 
@@ -18,29 +19,46 @@ namespace arcd {
     }
 
     bool DLLoader::load(const std::string& path) {
-        if (_handle) {
-            unload();
-        }
-
+        // Unload any previously loaded library
+        unload();
+        
+        std::cerr << "DEBUG: DLLoader attempting to load: " << path << std::endl;
+        
+        // Try to open the library
         _handle = dlopen(path.c_str(), RTLD_LAZY);
         if (!_handle) {
-            _lastError = dlerror();
+            _error = dlerror();
+            std::cerr << "DEBUG: DLLoader error: " << _error << std::endl;
             return false;
         }
+        
+        std::cerr << "DEBUG: DLLoader successfully loaded library" << std::endl;
         return true;
     }
 
-    void* DLLoader::getSymbol(const std::string& symbol) {
+    void* DLLoader::getSymbol(const std::string& symbolName) {
         if (!_handle) {
-            _lastError = "No library loaded";
+            _error = "No library loaded";
+            std::cerr << "DEBUG: DLLoader error: " << _error << std::endl;
             return nullptr;
         }
-
-        void* sym = dlsym(_handle, symbol.c_str());
-        if (!sym) {
-            _lastError = dlerror();
+        
+        std::cerr << "DEBUG: DLLoader looking for symbol: " << symbolName << std::endl;
+        
+        // Clear any existing error
+        dlerror();
+        
+        // Try to get the symbol
+        void* symbol = dlsym(_handle, symbolName.c_str());
+        const char* dlsymError = dlerror();
+        if (dlsymError) {
+            _error = dlsymError;
+            std::cerr << "DEBUG: DLLoader symbol error: " << _error << std::endl;
+            return nullptr;
         }
-        return sym;
+        
+        std::cerr << "DEBUG: DLLoader found symbol successfully" << std::endl;
+        return symbol;
     }
 
     bool DLLoader::unload() {
@@ -49,7 +67,7 @@ namespace arcd {
         }
 
         if (dlclose(_handle) != 0) {
-            _lastError = dlerror();
+            _error = dlerror();
             return false;
         }
 
@@ -58,7 +76,7 @@ namespace arcd {
     }
 
     std::string DLLoader::getError() const {
-        return _lastError;
+        return _error;
     }
 
     bool DLLoader::isLoaded() const {

@@ -8,6 +8,7 @@
 #include "Core.hpp"
 #include "utils/Error.hpp"
 #include <iostream>
+#include <time.h>
 
 namespace arcd {
 
@@ -16,12 +17,12 @@ Core::Core(const std::string& initialGraphicsLib)
 {
     _libManager = std::make_unique<LibraryManager>("./lib");
     _scoreManager = std::make_unique<ScoreManager>();
+    _gameManager = std::make_unique<GameManager>();
     _playerName = "Player";
     
-    // Try to load the initial graphics library
     if (!_libManager->loadGraphicsLibrary(initialGraphicsLib)) {
-        throw ArcadeError("Failed to load initial graphics library: " + 
-                         _libManager->getLastError());
+        std::string error = "Failed to load initial graphics library: " + _libManager->getLastError();
+        throw ArcadeError(error);
     }
     
     initializeMenu();
@@ -31,39 +32,71 @@ Core::~Core() {
     cleanup();
 }
 
-bool Core::initialize() {
-    // Initialize the graphics library
+bool Core::initialize()
+{
     auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
-    if (!graphicsLib || !graphicsLib->initialize()) {
-        displayError("Failed to initialize graphics library");
+    if (!graphicsLib) {
         return false;
     }
     
-    // Scan for available libraries
-    _libManager->scanLibraries();
+    if (!graphicsLib->initialize()) {
+        return false;
+    }
     
     return true;
 }
 
-void Core::run() {
+void Core::run()
+{
     auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
     if (!graphicsLib) {
         return;
     }
     
+    // Main loop
     while (_state != AppState::EXIT) {
-        // Handle input based on current state
-        int key = graphicsLib->getKey();
-        
-        if (_state == AppState::MENU) {
-            handleMenuInput(key);
-            renderMenu();
-        } else if (_state == AppState::GAME) {
-            handleGameInput(key);
-            renderGame();
+        try {
+            // Process input
+            int key = graphicsLib->getKey();
+            
+            // Check for exit key
+            if (key == 'q') {
+                _state = AppState::EXIT;
+                continue;
+            }
+            
+            // Handle input based on current state
+            if (_state == AppState::MENU) {
+                handleMenuInput(key);
+            } else if (_state == AppState::GAME) {
+                handleGameInput(key);
+            }
+            
+            // Update game state if in game mode
+            if (_state == AppState::GAME && _gameManager) {
+                _gameManager->update();
+            }
+            
+            graphicsLib->clear();
+            
+            // Render based on current state
+            if (_state == AppState::MENU) {
+                renderMenu();
+            } else if (_state == AppState::GAME) {
+                renderGame();
+            }
+            
+            graphicsLib->refresh();
+            
+        } catch (...) {
+            // Silently handle any exceptions
         }
         
-        graphicsLib->refresh();
+        // Add a small delay
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 50000000;
+        nanosleep(&ts, NULL);
     }
 }
 

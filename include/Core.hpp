@@ -10,6 +10,7 @@
 
 #include "managers/LibraryManager.hpp"
 #include "managers/ScoreManager.hpp"
+#include "managers/GameManager.hpp"
 #include <string>
 #include <memory>
 
@@ -25,6 +26,7 @@ class Core {
 private:
     std::unique_ptr<LibraryManager> _libManager;
     std::unique_ptr<ScoreManager> _scoreManager;
+    std::unique_ptr<GameManager> _gameManager;
     AppState _state;
     std::string _playerName;
     

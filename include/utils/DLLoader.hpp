@@ -10,13 +10,14 @@
 
 #include "../interfaces/ILibraryLoader.hpp"
 #include <dlfcn.h>
+#include <string>
 
 namespace arcd {
 
 class DLLoader : public ILibraryLoader {
 private:
     void* _handle;
-    std::string _lastError;
+    std::string _error;
 
 public:
     DLLoader();

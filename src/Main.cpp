@@ -6,29 +6,36 @@
 */
 
 #include "Core.hpp"
+#include "utils/Error.hpp"
 #include <iostream>
 
-int main(int argc, char** argv) {
-    // Check arguments
+int main(int argc, char** argv)
+{
+    // Check for correct number of arguments
     if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <graphics_library.so>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <graphics_library>" << std::endl;
         return 84;
     }
     
     try {
-        // Create and run the core application
-        arcd::Core arcade(argv[1]);
+        // Initialize the core with the specified graphics library
+        arcd::Core core(argv[1]);
         
-        if (!arcade.initialize()) {
+        // Initialize and run the core
+        if (!core.initialize()) {
             return 84;
         }
         
-        arcade.run();
-        arcade.cleanup();
-        
+        core.run();
         return 0;
-    } catch (const std::exception& e) {
+    } catch (const arcd::ArcadeError& e) {
         std::cerr << "Error: " << e.what() << std::endl;
+        return 84;
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected error: " << e.what() << std::endl;
+        return 84;
+    } catch (...) {
+        std::cerr << "Unknown error occurred" << std::endl;
         return 84;
     }
 }
