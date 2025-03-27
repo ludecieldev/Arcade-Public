@@ -123,20 +123,32 @@ void Core::initializeMenu() {
 }
 
 void Core::handleMenuInput(int key) {
-    // Simple menu navigation
-    if (key == 'q') {
+    // Updated menu navigation using arrow keys instead of 'w'/'s'
+    if (key == 'q' || key == 'Q' || key == 27) { // 'q', 'Q', or ESC key
         _state = AppState::EXIT;
-    } else if (key == 'w') {
+    } else if (key == 259) { // KEY_UP (Arrow Up)
         _selectedMenuOption = (_selectedMenuOption > 0) ? _selectedMenuOption - 1 : 0;
-    } else if (key == 's') {
+    } else if (key == 258) { // KEY_DOWN (Arrow Down)
         _selectedMenuOption = (_selectedMenuOption < static_cast<int>(_menuOptions.size()) - 1) ? 
                              _selectedMenuOption + 1 : static_cast<int>(_menuOptions.size()) - 1;
-    } else if (key == '\n' || key == ' ') {
+    } else if (key == 10) { // KEY_ENTER (Enter key)
         // Handle menu selection
-        if (_selectedMenuOption == 3) { // Exit option
+        if (_selectedMenuOption == 0) { // Select Game
+            // TODO: Implement game selection
+        } else if (_selectedMenuOption == 1) { // Select Graphics Library
+            // TODO: Implement graphics library selection
+        } else if (_selectedMenuOption == 2) { // Enter Name
+            auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
+            if (graphicsLib) {
+                graphicsLib->getPlayerName(_playerName);
+            }
+        } else if (_selectedMenuOption == 3) { // Exit option
             _state = AppState::EXIT;
         }
-        // Implement other menu options
+    } else if (key == '9') { // Switch graphics library
+        _libManager->switchToNextGraphicsLibrary();
+    } else if (key == '7') { // Switch game
+        _libManager->switchToNextGameLibrary();
     }
 }
 
@@ -182,7 +194,18 @@ void Core::handleGameInput(int key) {
     }
     
     // Handle special keys for the arcade
-    if (key == 'q') {
+    if (key == 'q' || key == 'Q') {
+        _state = AppState::MENU;
+    } else if (key == 'e' || key == 'E') {
+        _state = AppState::EXIT;
+    } else if (key == 'r' || key == 'R') {
+        // Restart game
+        gameLib->restart();
+    } else if (key == '9') {
+        // Switch graphics library
+        _libManager->switchToNextGraphicsLibrary();
+    } else if (key == '7') {
+        // Return to menu to switch games
         _state = AppState::MENU;
     } else {
         // Pass other keys to the game

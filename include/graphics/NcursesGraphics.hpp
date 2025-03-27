@@ -9,10 +9,13 @@
 #define NCURSES_GRAPHICS_HPP
 
 #include "../interfaces/IGraphicsLibrary.hpp"
+#include "../Core.hpp"
 #include <string>
 #include <vector>
 #include <map>
 #include <termios.h> // For terminal settings
+#include <optional>
+#include <functional>
 
 namespace arcd {
 
@@ -25,8 +28,10 @@ private:
     int _frameCounter;  // For animations
     struct termios _oldTermios;  // To restore terminal settings
     std::map<int, int> _colorPairs;
+    std::optional<std::reference_wrapper<Core>> _core;
     
     // Helper methods
+    void updateTerminalSize();
     void showSplashScreen();
     int waitForKey(int timeoutMs);
     void waitForAnyKey();
@@ -39,6 +44,14 @@ private:
     
     // Helper method to clear input buffer
     void flushInputBuffer();
+    
+    // Helper drawing methods
+    void drawTextCentered(int y, const std::string& text);
+    void drawBoxWithTitle(int x, int y, int width, int height, const std::string& title);
+    void drawFilledBox(int x, int y, int width, int height, char fillChar);
+    void drawHorizontalLine(int x, int y, int width);
+    void drawVerticalLine(int x, int y, int height);
+    void drawProgressBar(int x, int y, int width, int value, int maxValue);
 
 public:
     NcursesGraphics();
@@ -65,6 +78,9 @@ public:
     
     // Library information
     std::string getName() const override;
+    
+    // Set core reference - removed override since it doesn't match the interface
+    void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }
 };
 
 }
