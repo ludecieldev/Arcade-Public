@@ -17,37 +17,37 @@
 
 namespace arcd {
 
-class PlayerManager : public IPlayerManager {
-private:
-    std::string _playerName;
-    std::map<std::string, std::vector<GameScore>> _scores;
-    const std::string _saveDirectory;
-    const std::string _saveExtension;
+    class PlayerManager : public IPlayerManager {
+        private:
+            std::string _playerName;
+            std::map<std::string, std::vector<GameScore>> _scores;
+            const std::string _saveDirectory;
+            const std::string _saveExtension;
 
-    // Helper methods
-    std::string getCurrentDate() const;
-    std::string getPlayerFilePath() const;
+            // Helper methods
+            std::string getCurrentDate() const;
+            std::string getPlayerFilePath() const;
 
-public:
-    PlayerManager();
-    ~PlayerManager() override = default;
+        public:
+            PlayerManager();
+            ~PlayerManager() override = default;
 
-    // Player name management
-    void setPlayerName(const std::string& name) override;
-    std::string getPlayerName() const override;
-    bool hasPlayerName() const override;
+            // Player name management
+            void setPlayerName(const std::string& name) override;
+            std::string getPlayerName() const override;
+            bool hasPlayerName() const override;
 
-    // Score management
-    void addScore(const std::string& gameName, int score) override;
-    int getBestScore(const std::string& gameName) const override;
-    std::vector<GameScore> getScores(const std::string& gameName) const override;
-    std::vector<GameScore> getAllScores() const override;
+            // Score management
+            void addScore(const std::string& gameName, int score) override;
+            int getBestScore(const std::string& gameName) const override;
+            std::vector<GameScore> getScores(const std::string& gameName) const override;
+            std::vector<GameScore> getAllScores() const override;
 
-    // Save/load player data
-    bool saveData() override;
-    bool loadData() override;
-};
+            // Save/load player data
+            bool saveData() override;
+            bool loadData() override;
+    };
 
-} // namespace arcd
+}
 
 #endif // PLAYER_MANAGER_HPP

@@ -16,45 +16,44 @@
 
 namespace arcd {
 
-enum class AppState {
-    MENU,
-    GAME,
-    EXIT
-};
+    enum class AppState {
+        MENU,
+        GAME,
+        EXIT
+    };
 
-class Core {
-private:
-    std::unique_ptr<LibraryManager> _libManager;
-    std::unique_ptr<ScoreManager> _scoreManager;
-    std::unique_ptr<GameManager> _gameManager;
-    AppState _state;
-    std::string _playerName;
-    
-    // Menu options
-    int _selectedMenuOption;
-    std::vector<std::string> _menuOptions;
-    
-    void initializeMenu();
-    void handleMenuInput(int key);
-    void renderMenu();
-    
-    void handleGameInput(int key);
-    void renderGame();
-    
-    void displayError(const std::string& message);
+    class Core {
+        private:
+            std::unique_ptr<LibraryManager> _libManager;
+            std::unique_ptr<ScoreManager> _scoreManager;
+            std::unique_ptr<GameManager> _gameManager;
+            AppState _state;
+            std::string _playerName;
 
-public:
-    Core(const std::string& initialGraphicsLib);
-    ~Core();
-    
-    bool initialize();
-    void run();
-    void cleanup();
-    
-    // Getters
-    AppState getState() const;
-};
+            // Menu options
+            int _selectedMenuOption;
+            std::vector<std::string> _menuOptions;
+            void initializeMenu();
 
-} // namespace arcd
+            void handleMenuInput(int key);
+            void renderMenu();
+
+            void handleGameInput(int key);
+            void renderGame();
+            void displayError(const std::string& message);
+
+        public:
+            Core(const std::string& initialGraphicsLib);
+            ~Core();
+
+            bool initialize();
+            void run();
+            void cleanup();
+
+            // Getters
+            AppState getState() const;
+    };
+
+}
 
 #endif // CORE_HPP

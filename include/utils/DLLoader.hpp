@@ -14,21 +14,21 @@
 
 namespace arcd {
 
-class DLLoader : public ILibraryLoader {
-private:
-    void* _handle;
-    std::string _error;
+    class DLLoader : public ILibraryLoader {
+        private:
+            void* _handle;
+            std::string _error;
 
-public:
-    DLLoader();
-    ~DLLoader() override;
+        public:
+            DLLoader();
+            ~DLLoader() override;
 
-    bool load(const std::string& path) override;
-    void* getSymbol(const std::string& symbol) override;
-    bool unload() override;
-    std::string getError() const override;
-    bool isLoaded() const override;
-};
+            bool load(const std::string& path) override;
+            void* getSymbol(const std::string& symbol) override;
+            bool unload() override;
+            std::string getError() const override;
+            bool isLoaded() const override;
+    };
 
 }
 

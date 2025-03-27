@@ -13,14 +13,14 @@
 
 namespace arcd {
 
-class ArcadeError : public std::exception {
-private:
-    std::string _message;
+    class ArcadeError : public std::exception {
+        private:
+            std::string _message;
 
-public:
-    explicit ArcadeError(const std::string& message);
-    const char* what() const noexcept override;
-};
+        public:
+            explicit ArcadeError(const std::string& message);
+            const char* what() const noexcept override;
+    };
 
 }
 
