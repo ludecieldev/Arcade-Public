@@ -2,341 +2,319 @@
 ** EPITECH PROJECT, 2025
 ** Arcade-Public
 ** File description:
-** NcursesGraphics
+** NcursesGraphics - Terminal-based graphics using ANSI escape sequences
 */
 
 #include "graphics/NcursesGraphics.hpp"
-#include <algorithm>
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include <iomanip>
+#include <algorithm>
 #include <unistd.h>
-#include <sys/select.h>
 #include <termios.h>
 #include <sys/ioctl.h>
-#include <cstring>
+#include <fcntl.h>
+#include <string.h>
+#include <poll.h>
 
 namespace arcd {
 
-// Key constants
-constexpr int KEY_UP_CODE = 65;     // Up arrow
-constexpr int KEY_DOWN_CODE = 66;   // Down arrow
-constexpr int KEY_RIGHT_CODE = 67;  // Right arrow
-constexpr int KEY_LEFT_CODE = 68;   // Left arrow
-constexpr int KEY_ENTER_CODE = 10;  // Enter key
-constexpr int KEY_ESC = 27;         // Escape key
-constexpr int KEY_SPACE = 32;       // Space key
+// Define key constants as enum to avoid conflicts
+#define KEY_UP 259
+#define KEY_DOWN 258
+#define KEY_LEFT 260
+#define KEY_RIGHT 261
+#define KEY_ENTER 10
+#define KEY_ESC 27
+#define KEY_BACKSPACE 127
 
-NcursesGraphics::NcursesGraphics() : _initialized(false), _width(80), _height(24), _lastKey(0), _frameCounter(0)
+NcursesGraphics::NcursesGraphics() : 
+    _initialized(false), 
+    _width(80), 
+    _height(24),
+    _lastKey(0),
+    _frameCounter(0)
 {
     // Get terminal size
-    struct winsize w;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    _width = w.ws_col;
-    _height = w.ws_row;
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
+        _width = ws.ws_col;
+        _height = ws.ws_row;
+    }
     
     // Save original terminal settings
     tcgetattr(STDIN_FILENO, &_oldTermios);
-    
-    // Configure terminal for raw input
-    struct termios raw = _oldTermios;
-    raw.c_lflag &= ~(ECHO | ICANON);
-    raw.c_cc[VMIN] = 0;
-    raw.c_cc[VTIME] = 0;
-    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }
 
 NcursesGraphics::~NcursesGraphics()
 {
     cleanup();
-    
-    // Restore original terminal settings
-    tcsetattr(STDIN_FILENO, TCSANOW, &_oldTermios);
 }
 
 bool NcursesGraphics::initialize()
 {
-    if (_initialized) {
-        return true;
-    }
+    if (_initialized) return true;
+    
+    // Configure terminal for raw input mode
+    struct termios newTermios = _oldTermios;
+    newTermios.c_lflag &= ~(ICANON | ECHO);
+    newTermios.c_cc[VMIN] = 0;
+    newTermios.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newTermios);
+    
+    // Set non-blocking input
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+    
+    // Hide cursor and clear screen
+    std::cout << "\033[?25l" << "\033[2J" << "\033[H";
+    std::cout.flush();
     
     _initialized = true;
     
-    // Clear screen
-    std::cout << "\033[2J\033[H";
-    
-    // Get terminal size again to ensure it's up to date
-    struct winsize w;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    _width = w.ws_col;
-    _height = w.ws_row;
-    
-    // Big arcade logo, properly centered
-    std::string logo[] = {
-        "╔═════════════════════════════════════════════╗",
-        "║                                             ║",
-        "║   █████╗ ██████╗  ██████╗ █████╗ ██████╗ ███████╗   ║",
-        "║  ██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝   ║",
-        "║  ███████║██████╔╝██║     ███████║██║  ██║█████╗     ║",
-        "║  ██╔══██║██╔══██╗██║     ██╔══██║██║  ██║██╔══╝     ║",
-        "║  ██║  ██║██║  ██║╚██████╗██║  ██║██████╔╝███████╗   ║",
-        "║  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═════╝ ╚══════╝   ║",
-        "║                                             ║",
-        "╚═════════════════════════════════════════════╝"
-    };
-    
-    // Calculate center positions
-    int logoHeight = sizeof(logo) / sizeof(logo[0]);
-    int logoWidth = static_cast<int>(logo[0].length());
-    int startY = (_height - logoHeight - 4) / 2;
-    
-    // Draw the centered logo
-    std::cout << "\033[1;33m"; // Yellow
-    for (int i = 0; i < logoHeight; i++) {
-        int startX = (_width - logoWidth) / 2;
-        drawText(startX, startY + i, logo[i]);
-    }
-    
-    // Display welcome message
-    std::cout << "\033[1;36m"; // Cyan
-    std::string welcome = "Welcome to the Arcade System!";
-    drawText((_width - static_cast<int>(welcome.length())) / 2, startY + logoHeight + 1, welcome);
-    
-    std::string pressKey = "Press any key to start...";
-    drawText((_width - static_cast<int>(pressKey.length())) / 2, startY + logoHeight + 2, pressKey);
-    std::cout << "\033[0m"; // Reset
-    
-    // Control instructions
-    std::cout << "\033[1;37m"; // White
-    std::string controls = "Controls: ARROWS=Move | 9=Next lib | 7=Next game | R=Restart | Q=Menu | E=Exit";
-    drawText((_width - static_cast<int>(controls.length())) / 2, _height - 2, controls);
-    std::cout << "\033[0m"; // Reset
-    
-    std::cout.flush();
-    
-    // Wait for a keypress
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    flushInputBuffer();
+    // Show splash screen
+    showSplashScreen();
     
     return true;
 }
 
 void NcursesGraphics::cleanup()
 {
+    if (!_initialized) return;
+    
+    // Reset terminal
+    std::cout << "\033[0m" << "\033[?25h" << "\033[2J" << "\033[H";
+    std::cout.flush();
+    
+    // Restore terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &_oldTermios);
+    
     _initialized = false;
-}
-
-void NcursesGraphics::initColors()
-{
-    // No implementation needed
-}
-
-int NcursesGraphics::getColorPair(int fg, [[maybe_unused]] int bg)
-{
-    return fg;
 }
 
 void NcursesGraphics::clear()
 {
-    if (_initialized) {
-        std::cout << "\033[2J\033[H";
-    }
+    if (!_initialized) return;
+    std::cout << "\033[2J" << "\033[H";
 }
 
 void NcursesGraphics::refresh()
 {
-    if (_initialized) {
-        std::cout.flush();
-        _frameCounter++;
-    }
+    if (!_initialized) return;
+    std::cout.flush();
+    _frameCounter++;
 }
 
 void NcursesGraphics::drawText(int x, int y, const std::string& text)
 {
-    if (!_initialized) {
-        return;
-    }
+    if (!_initialized) return;
     
+    // Check boundaries
+    if (y < 0 || y >= _height || x < 0) return;
+    
+    // Move cursor and output text
     std::cout << "\033[" << (y+1) << ";" << (x+1) << "H" << text;
 }
 
 void NcursesGraphics::drawBox(int x, int y, int width, int height)
 {
-    if (!_initialized) {
-        return;
-    }
+    if (!_initialized) return;
+    
+    // Validate dimensions
+    if (width < 2 || height < 2) return;
+    
+    // Ensure box fits in the screen
+    width = std::min(width, _width - x);
+    height = std::min(height, _height - y);
+    
+    if (width < 2 || height < 2) return;
     
     // Top border
-    std::cout << "\033[" << (y+1) << ";" << (x+1) << "H╔";
-    for (int i = 0; i < width - 2; i++) std::cout << "═";
-    std::cout << "╗";
+    drawText(x, y, "╔");
+    for (int i = 1; i < width - 1; i++) {
+        drawText(x + i, y, "═");
+    }
+    drawText(x + width - 1, y, "╗");
     
     // Sides
-    for (int i = 1; i < height - 1; i++) {
-        std::cout << "\033[" << (y+i+1) << ";" << (x+1) << "H║";
-        std::cout << "\033[" << (y+i+1) << ";" << (x+width) << "H║";
+    for (int j = 1; j < height - 1; j++) {
+        drawText(x, y + j, "║");
+        drawText(x + width - 1, y + j, "║");
     }
     
     // Bottom border
-    std::cout << "\033[" << (y+height) << ";" << (x+1) << "H╚";
-    for (int i = 0; i < width - 2; i++) std::cout << "═";
-    std::cout << "╝";
+    drawText(x, y + height - 1, "╚");
+    for (int i = 1; i < width - 1; i++) {
+        drawText(x + i, y + height - 1, "═");
+    }
+    drawText(x + width - 1, y + height - 1, "╝");
 }
 
-void NcursesGraphics::drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex)
+void NcursesGraphics::drawList([[maybe_unused]] int x, [[maybe_unused]] int y, 
+                              const std::vector<std::string>& items, int selectedIndex)
 {
-    if (!_initialized) {
-        return;
-    }
+    if (!_initialized || items.empty()) return;
     
-    // Menu constants
-    const int boxWidth = 50;
-    const int boxHeight = static_cast<int>(items.size()) + 6;
+    // Clear first
+    clear();
     
-    // Center on screen if x,y are 0
-    int menuX = x > 0 ? x : (_width - boxWidth) / 2;
-    int menuY = y > 0 ? y : (_height - boxHeight) / 2;
+    // Title
+    std::string title = "ARCADE MENU";
+    std::cout << "\033[1;36m"; // Bright cyan
+    drawBox(_width/2 - 10, 1, 20, 3);
+    drawText(_width/2 - title.length()/2, 2, title);
+    std::cout << "\033[0m";
     
-    // Draw menu box with double border for more aesthetics
-    std::cout << "\033[" << (menuY+1) << ";" << (menuX+1) << "H╔";
-    for (int i = 0; i < boxWidth - 2; i++) std::cout << "═";
-    std::cout << "╗";
+    // Menu items with separate boxes
+    const int boxWidth = 30;
+    const int boxHeight = 3;
+    const int spacing = 1;
+    const int startY = 6;
     
-    // Menu title
-    std::cout << "\033[" << (menuY+2) << ";" << (menuX+1) << "H║";
-    std::cout << "\033[1;36m"; // Cyan
-    std::string title = " ARCADE MENU ";
-    int titleX = (boxWidth - static_cast<int>(title.length())) / 2;
-    for (int i = 0; i < titleX; i++) std::cout << " ";
-    std::cout << title;
-    for (int i = 0; i < boxWidth - 2 - titleX - static_cast<int>(title.length()); i++) std::cout << " ";
-    std::cout << "\033[0m"; // Reset
-    std::cout << "║";
-    
-    // Separator
-    std::cout << "\033[" << (menuY+3) << ";" << (menuX+1) << "H╠";
-    for (int i = 0; i < boxWidth - 2; i++) std::cout << "═";
-    std::cout << "╣";
-    
-    // Menu items
     for (size_t i = 0; i < items.size(); i++) {
-        int itemY = menuY + 4 + static_cast<int>(i);
-        std::cout << "\033[" << itemY << ";" << (menuX+1) << "H║";
+        int itemY = startY + i * (boxHeight + spacing);
         
-        // Basic box for each item
-        if (static_cast<int>(i) == selectedIndex) {
-            // Highlighted item - with animation based on frame counter
-            std::string prefix;
-            if (_frameCounter % 6 < 3) {
-                prefix = "►► ";
-                std::cout << "\033[1;33m"; // Bright yellow
-            } else {
-                prefix = " ► ";
-                std::cout << "\033[1;32m"; // Bright green
-            }
-            
-            // Centered item text
-            int textLen = static_cast<int>(items[i].length() + prefix.length());
-            int padding = (boxWidth - 2 - textLen) / 2;
-            for (int j = 0; j < padding; j++) std::cout << " ";
-            std::cout << prefix << items[i];
-            for (int j = 0; j < boxWidth - 2 - padding - textLen; j++) std::cout << " ";
-            std::cout << "\033[0m"; // Reset
+        if ((int)i == selectedIndex) {
+            std::cout << "\033[1;33m"; // Bright yellow for selected
         } else {
-            // Regular item - centered
-            int padding = (boxWidth - 2 - static_cast<int>(items[i].length())) / 2;
-            for (int j = 0; j < padding; j++) std::cout << " ";
-            std::cout << items[i];
-            for (int j = 0; j < boxWidth - 2 - padding - static_cast<int>(items[i].length()); j++) std::cout << " ";
+            std::cout << "\033[0m"; // Reset for unselected
         }
-        std::cout << "║";
+        
+        // Draw box
+        drawBox(_width/2 - boxWidth/2, itemY, boxWidth, boxHeight);
+        
+        // Draw text
+        drawText(_width/2 - items[i].length()/2, itemY + 1, items[i]);
     }
     
-    // Extra space before bottom border
-    std::cout << "\033[" << (menuY+4+static_cast<int>(items.size())) << ";" << (menuX+1) << "H║";
-    for (int i = 0; i < boxWidth - 2; i++) std::cout << " ";
-    std::cout << "║";
-    
-    // Bottom border
-    std::cout << "\033[" << (menuY+5+static_cast<int>(items.size())) << ";" << (menuX+1) << "H╚";
-    for (int i = 0; i < boxWidth - 2; i++) std::cout << "═";
-    std::cout << "╝";
-    
-    // Draw control instructions
-    std::cout << "\033[" << (menuY+boxHeight) << ";" << menuX << "H";
-    std::cout << "\033[1;37m"; // White
-    std::string controls = "↑/↓: Navigate | Enter: Select | Q: Menu | E: Exit";
-    int controlsX = (boxWidth - static_cast<int>(controls.length())) / 2;
-    for (int i = 0; i < controlsX; i++) std::cout << " ";
-    std::cout << controls;
+    // Draw controls
+    std::cout << "\033[0m\033[1m"; // Reset and bold
+    std::string controls = "↑/↓: Navigate | Enter: Select | Q: Quit";
+    drawText(_width/2 - controls.length()/2, _height - 2, controls);
     std::cout << "\033[0m"; // Reset
     
-    // Additional controls below
-    std::cout << "\033[" << (menuY+boxHeight+1) << ";" << menuX << "H";
-    std::cout << "\033[1;37m"; // White
-    std::string gameControls = "9: Next Graphics | 7: Next Game | R: Restart";
-    int gameControlsX = (boxWidth - static_cast<int>(gameControls.length())) / 2;
-    for (int i = 0; i < gameControlsX; i++) std::cout << " ";
-    std::cout << gameControls;
-    std::cout << "\033[0m"; // Reset
+    refresh();
 }
 
-void NcursesGraphics::flushInputBuffer()
+void NcursesGraphics::getPlayerName(std::string& playerName)
 {
-    tcflush(STDIN_FILENO, TCIFLUSH);
-    _lastKey = 0;
+    if (!_initialized) return;
+    
+    // Clear screen and setup
+    clear();
+    
+    const int boxWidth = 40;
+    const int boxHeight = 5;
+    const int boxX = _width/2 - boxWidth/2;
+    const int boxY = _height/2 - boxHeight/2;
+    
+    // Title
+    std::cout << "\033[1;36m"; // Bright cyan
+    drawBox(boxX, boxY - 4, boxWidth, 3);
+    std::string title = "ENTER PLAYER NAME";
+    drawText(boxX + boxWidth/2 - title.length()/2, boxY - 3, title);
+    std::cout << "\033[0m";
+    
+    // Input box
+    std::cout << "\033[1;37m"; // White
+    drawBox(boxX, boxY, boxWidth, boxHeight);
+    std::cout << "\033[0m";
+    
+    // Instructions
+    std::string instructions = "Enter your name (max 15 chars):";
+    drawText(boxX + boxWidth/2 - instructions.length()/2, boxY + 1, instructions);
+    
+    // Status
+    std::string status = "Press ENTER to confirm, ESC to cancel";
+    drawText(boxX + boxWidth/2 - status.length()/2, boxY + boxHeight + 2, status);
+    
+    // Input handling
+    const int inputX = boxX + 5;
+    const int inputY = boxY + 3;
+    std::string input = playerName;
+    const size_t maxLength = 15;
+    
+    bool done = false;
+    while (!done) {
+        // Display input with cursor
+        std::string spaces(maxLength + 1, ' ');
+        drawText(inputX, inputY, spaces);
+        drawText(inputX, inputY, input + "_");
+        refresh();
+        
+        // Get input
+        int key = waitForKey(500); // 500ms timeout
+        
+        if (key == KEY_ENTER) {
+            done = true;
+        } else if (key == KEY_ESC) {
+            input = playerName; // Restore original
+            done = true;
+        } else if (key == KEY_BACKSPACE) {
+            if (!input.empty()) {
+                input.pop_back();
+            }
+        } else if (key >= 32 && key <= 126) { // Printable ASCII
+            if (input.length() < maxLength) {
+                input += static_cast<char>(key);
+            }
+        }
+    }
+    
+    // Update player name if not empty
+    if (!input.empty()) {
+        playerName = input;
+    }
+    
+    clear();
 }
 
 int NcursesGraphics::getKey()
 {
-    if (!_initialized) {
-        return 0;
-    }
+    if (!_initialized) return 0;
     
-    // Check for input with a minimal delay
-    fd_set readfds;
-    struct timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = 10000; // 10ms
+    char buffer[8] = {0};
+    int bytesRead = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
     
-    FD_ZERO(&readfds);
-    FD_SET(STDIN_FILENO, &readfds);
+    if (bytesRead <= 0) return 0;
     
-    if (select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv) > 0) {
-        char buf[3] = {0};
-        int n = read(STDIN_FILENO, buf, sizeof(buf));
-        
-        if (n > 0) {
-            if (buf[0] == KEY_ESC && n > 2) {
-                // Arrow keys (Escape sequence)
-                if (buf[1] == '[') {
-                    switch (buf[2]) {
-                        case KEY_UP_CODE: return KEY_UP; // Up arrow
-                        case KEY_DOWN_CODE: return KEY_DOWN; // Down arrow
-                        case KEY_RIGHT_CODE: return KEY_RIGHT; // Right arrow
-                        case KEY_LEFT_CODE: return KEY_LEFT; // Left arrow
-                    }
-                }
-                return 0; // Unknown escape sequence
-            } else if (n == 1) {
-                // Map specific keys
-                switch (buf[0]) {
-                    case '7': return '7'; // Next game
-                    case '9': return '9'; // Next graphics
-                    case 'r':
-                    case 'R': return 'r'; // Restart
-                    case 'q':
-                    case 'Q': return 'q'; // Menu
-                    case 'e':
-                    case 'E': return 'e'; // Exit
-                    default: return buf[0]; // Other keys
-                }
-            }
+    // Handle escape sequences for arrow keys
+    if (bytesRead >= 3 && buffer[0] == 27 && buffer[1] == '[') {
+        switch (buffer[2]) {
+            case 'A': return KEY_UP;    // Up arrow
+            case 'B': return KEY_DOWN;  // Down arrow
+            case 'C': return KEY_RIGHT; // Right arrow
+            case 'D': return KEY_LEFT;  // Left arrow
         }
     }
     
-    return 0; // No key pressed
+    // Handle regular keys
+    if (bytesRead == 1) {
+        switch (buffer[0]) {
+            case 27:  return KEY_ESC;      // ESC
+            case 127: return KEY_BACKSPACE; // Backspace
+            case 10:  return KEY_ENTER;     // Enter
+            default:  return buffer[0];    // Regular character
+        }
+    }
+    
+    return 0;
+}
+
+void NcursesGraphics::flushInputBuffer()
+{
+    if (!_initialized) return;
+    tcflush(STDIN_FILENO, TCIFLUSH);
+}
+
+void NcursesGraphics::initColors()
+{
+    // Not needed - we use ANSI escape codes
+}
+
+int NcursesGraphics::getColorPair(int fg, [[maybe_unused]] int bg)
+{
+    return fg; // Just return fg - bg is ignored in this implementation
 }
 
 std::string NcursesGraphics::getName() const
@@ -344,9 +322,84 @@ std::string NcursesGraphics::getName() const
     return "Ncurses";
 }
 
+// Helper function for splash screen
+void NcursesGraphics::showSplashScreen()
+{
+    if (!_initialized) return;
+    
+    clear();
+    
+    // Draw logo
+    std::string logo[] = {
+        "╔══════════════════════════════════════════════════════╗",
+        "║  █████╗ ██████╗  ██████╗ █████╗ ██████╗ ███████╗     ║",
+        "║ ██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝     ║",
+        "║ ███████║██████╔╝██║     ███████║██║  ██║█████╗       ║",
+        "║ ██╔══██║██╔══██╗██║     ██╔══██║██║  ██║██╔══╝       ║",
+        "║ ██║  ██║██║  ██║╚██████╗██║  ██║██████╔╝███████╗     ║",
+        "║ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═════╝ ╚══════╝     ║",
+        "╚══════════════════════════════════════════════════════╝"
+    };
+    
+    int logoHeight = sizeof(logo) / sizeof(logo[0]);
+    int logoY = _height/2 - logoHeight - 5;
+    
+    // Draw logo with color
+    std::cout << "\033[1;33m"; // Bright yellow
+    for (int i = 0; i < logoHeight; i++) {
+        drawText(_width/2 - logo[i].length()/2, logoY + i, logo[i]);
+    }
+    
+    // Welcome message
+    std::cout << "\033[1;36m"; // Bright cyan
+    std::string welcome = "Welcome to the Arcade System!";
+    drawText(_width/2 - welcome.length()/2, logoY + logoHeight + 2, welcome);
+    
+    std::string press = "Press any key to start...";
+    drawText(_width/2 - press.length()/2, logoY + logoHeight + 4, press);
+    
+    // Controls
+    std::cout << "\033[1;37m"; // Bright white
+    std::string controls = "CONTROLS: Arrow Keys=Navigate | Enter=Select | 9=Next Lib | 7=Next Game | R=Restart | Q=Menu | E=Exit";
+    drawText(_width/2 - controls.length()/2, _height - 3, controls);
+    
+    std::cout << "\033[0m"; // Reset colors
+    refresh();
+    
+    // Wait for keypress
+    waitForAnyKey();
+    
+    // Clear screen before returning
+    clear();
+}
+
+// Helper function to wait for specific key with timeout
+int NcursesGraphics::waitForKey(int timeoutMs)
+{
+    struct pollfd pfd = {STDIN_FILENO, POLLIN, 0};
+    int result = poll(&pfd, 1, timeoutMs);
+    
+    if (result > 0 && (pfd.revents & POLLIN)) {
+        return getKey();
+    }
+    
+    return 0;
+}
+
+// Helper function to wait for any key
+void NcursesGraphics::waitForAnyKey()
+{
+    flushInputBuffer();
+    while (true) {
+        if (waitForKey(100) != 0) {
+            break;
+        }
+    }
+    flushInputBuffer();
+}
+
 } // namespace arcd
 
-// Export C functions for dynamic loading
 extern "C" {
     arcd::IGraphicsLibrary* createGraphicsLibrary() {
         return new arcd::NcursesGraphics();

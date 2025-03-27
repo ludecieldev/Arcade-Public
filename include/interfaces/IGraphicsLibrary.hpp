@@ -33,6 +33,9 @@ public:
     // Input handling
     virtual int getKey() = 0;
     
+    // Player name input
+    virtual void getPlayerName(std::string& playerName) = 0;
+    
     // Library information
     virtual std::string getName() const = 0;
 };

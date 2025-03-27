@@ -9,7 +9,6 @@
 #define NCURSES_GRAPHICS_HPP
 
 #include "../interfaces/IGraphicsLibrary.hpp"
-#include <ncurses.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -26,6 +25,11 @@ private:
     int _frameCounter;  // For animations
     struct termios _oldTermios;  // To restore terminal settings
     std::map<int, int> _colorPairs;
+    
+    // Helper methods
+    void showSplashScreen();
+    int waitForKey(int timeoutMs);
+    void waitForAnyKey();
     
     // Initialize color pairs
     void initColors();
@@ -52,6 +56,9 @@ public:
     void drawText(int x, int y, const std::string& text) override;
     void drawBox(int x, int y, int width, int height) override;
     void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex) override;
+    
+    // Player name input
+    void getPlayerName(std::string& playerName) override;
     
     // Input handling
     int getKey() override;

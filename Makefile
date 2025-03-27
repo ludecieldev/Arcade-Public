@@ -12,7 +12,8 @@ CORE_SRC = src/Main.cpp \
            src/Core.cpp \
            src/managers/LibraryManager.cpp \
            src/managers/ScoreManager.cpp \
-           src/managers/GameManager.cpp
+           src/managers/GameManager.cpp \
+           src/managers/PlayerManager.cpp
 CORE_OBJ = $(CORE_SRC:.cpp=.o)
 CORE_NAME = arcade
 
