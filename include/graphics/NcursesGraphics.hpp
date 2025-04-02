@@ -5,8 +5,7 @@
 ** NcursesGraphics
 */
 
-#ifndef NCURSES_GRAPHICS_HPP
-#define NCURSES_GRAPHICS_HPP
+#pragma once
 
 #include "../interfaces/IGraphicsLibrary.hpp"
 #include "../Core.hpp"
@@ -16,72 +15,86 @@
 #include <termios.h> // For terminal settings
 #include <optional>
 #include <functional>
+#include <ncurses.h>
 
 namespace arcd {
 
-    class NcursesGraphics : public IGraphicsLibrary {
-        private:
-            bool _initialized;
-            int _width;
-            int _height;
-            int _lastKey;
-            int _frameCounter;  // For animations
-            struct termios _oldTermios;  // To restore terminal settings
-            std::map<int, int> _colorPairs;
-            std::optional<std::reference_wrapper<Core>> _core;
+// ANSI color mapping helper
+struct ColorMapper {
+    static std::string getAnsiCode(Color color);
+    static std::string getBrightAnsiCode(Color color);
+    static std::string getBold();
+    static std::string getReset();
+};
 
-            // Helper methods
-            void updateTerminalSize();
-            void showSplashScreen();
-            int waitForKey(int timeoutMs);
-            void waitForAnyKey();
+class NcursesGraphics : public IGraphicsLibrary {
+    private:
+        bool _initialized;
+        int _width;
+        int _height;
+        int _lastKey;
+        int _frameCounter;  // For animations
+        struct termios _oldTermios;  // To restore terminal settings
+        std::map<int, int> _colorPairs;
+        std::optional<std::reference_wrapper<Core>> _core;
 
-            // Initialize color pairs
-            void initColors();
+        // Helper methods
+        void updateTerminalSize();
+        void showSplashScreen();
+        int waitForKey(int timeoutMs);
+        void waitForAnyKey();
 
-            // Get a color pair index
-            int getColorPair(int fg, int bg);
+        // Initialize color pairs
+        void initColors();
 
-            // Helper method to clear input buffer
-            void flushInputBuffer();
+        // Get a color pair index
+        int getColorPair(int fg, int bg);
 
-            // Helper drawing methods
-            void drawTextCentered(int y, const std::string& text);
-            void drawBoxWithTitle(int x, int y, int width, int height, const std::string& title);
-            void drawFilledBox(int x, int y, int width, int height, char fillChar);
-            void drawHorizontalLine(int x, int y, int width);
-            void drawVerticalLine(int x, int y, int height);
-            void drawProgressBar(int x, int y, int width, int value, int maxValue);
+        // Helper method to clear input buffer
+        void flushInputBuffer();
 
-        public:
-            NcursesGraphics();
-            ~NcursesGraphics() override;
+        // Helper drawing methods
+        void drawTextCentered(int y, const std::string& text, Color color = Color::DEFAULT);
+        void drawBoxWithTitle(int x, int y, int width, int height, const std::string& title, Color color = Color::DEFAULT);
+        void drawFilledBox(int x, int y, int width, int height, char fillChar, Color color = Color::DEFAULT);
+        void drawHorizontalLine(int x, int y, int width, Color color = Color::DEFAULT);
+        void drawVerticalLine(int x, int y, int height, Color color = Color::DEFAULT);
+        void drawProgressBar(int x, int y, int width, int value, int maxValue, Color color = Color::DEFAULT);
+        void drawBoldText(int x, int y, const std::string& text, Color color);
 
-            // Initialization and cleanup
-            bool initialize() override;
-            void cleanup() override;
+    public:
+        NcursesGraphics();
+        ~NcursesGraphics() override;
 
-            // Display functions
-            void clear() override;
-            void refresh() override;
+        // Initialization and cleanup
+        bool initialize() override;
+        void cleanup() override;
 
-            // Drawing functions
-            void drawText(int x, int y, const std::string& text) override;
-            void drawBox(int x, int y, int width, int height) override;
-            void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex) override;
+        // Display functions
+        void clear() override;
+        void refresh() override;
 
-            // Player name input
-            void getPlayerName(std::string& playerName) override;
+        // Drawing functions with color support
+        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) override;
+        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) override;
+        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) override;
 
-            // Input handling
-            int getKey() override;
+        // Input handling
+        int getKey() override;
 
-            // Library information
-            std::string getName() const override;
+        // Player name input
+        void getPlayerName(std::string& playerName) override;
 
-            // Set core reference - removed override since it doesn't match the interface
-            void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }
-    };
+        // Library information
+        std::string getName() const override;
+
+        // Window dimensions
+        int getWidth() const override { return _width; }
+        int getHeight() const override { return _height; }
+
+        // Set core reference
+        void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }
+};
 
 }
 
@@ -89,5 +102,3 @@ extern "C" {
     arcd::IGraphicsLibrary* createGraphicsLibrary();
     void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib);
 }
-
-#endif // NCURSES_GRAPHICS_HPP

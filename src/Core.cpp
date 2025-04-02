@@ -9,6 +9,8 @@
 #include "utils/Error.hpp"
 #include <iostream>
 #include <time.h>
+#include <ncurses.h>
+#include <string.h>
 
 namespace arcd {
 
@@ -123,15 +125,14 @@ void Core::initializeMenu() {
 }
 
 void Core::handleMenuInput(int key) {
-    // Updated menu navigation using arrow keys instead of 'w'/'s'
-    if (key == 'q' || key == 'Q' || key == 27) { // 'q', 'Q', or ESC key
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
         _state = AppState::EXIT;
-    } else if (key == 259) { // KEY_UP (Arrow Up)
+    } else if (key == IGraphicsLibrary::KEY_UP_CODE) {
         _selectedMenuOption = (_selectedMenuOption > 0) ? _selectedMenuOption - 1 : 0;
-    } else if (key == 258) { // KEY_DOWN (Arrow Down)
+    } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
         _selectedMenuOption = (_selectedMenuOption < static_cast<int>(_menuOptions.size()) - 1) ? 
                              _selectedMenuOption + 1 : static_cast<int>(_menuOptions.size()) - 1;
-    } else if (key == 10) { // KEY_ENTER (Enter key)
+    } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
         // Handle menu selection
         if (_selectedMenuOption == 0) { // Select Game
             // TODO: Implement game selection
@@ -160,30 +161,49 @@ void Core::renderMenu() {
     
     graphicsLib->clear();
     
-    // Draw title
-    graphicsLib->drawText(10, 2, "ARCADE");
+    // Draw title box
+    int titleWidth = 40;
+    int titleHeight = 3;
+    int startX = (graphicsLib->getWidth() - titleWidth) / 2;
+    int startY = (graphicsLib->getHeight() - titleHeight) / 2;
     
-    // Draw menu options
-    for (size_t i = 0; i < _menuOptions.size(); ++i) {
-        graphicsLib->drawText(10, 5 + static_cast<int>(i), 
-                             (i == static_cast<size_t>(_selectedMenuOption) ? "> " : "  ") + _menuOptions[i]);
+    graphicsLib->drawBox(startX, startY, titleWidth, titleHeight, Color::CYAN);
+    graphicsLib->drawText(startX + (titleWidth - 6) / 2, startY + 1, "ARCADE", Color::CYAN);
+    
+    // Draw menu items
+    int menuStartY = startY + titleHeight + 2;
+    for (size_t i = 0; i < _menuOptions.size(); i++) {
+        std::string prefix = (i == static_cast<size_t>(_selectedMenuOption)) ? "> " : "  ";
+        graphicsLib->drawText(startX + 2, menuStartY + i, prefix + _menuOptions[i], Color::GREEN);
     }
     
-    // Draw available libraries
-    graphicsLib->drawText(40, 2, "Graphics Libraries:");
-    auto graphicsLibs = _libManager->getGraphicsLibraries();
-    for (size_t i = 0; i < graphicsLibs.size(); ++i) {
-        graphicsLib->drawText(40, 3 + i, graphicsLibs[i]);
-    }
+    // Draw side panels
+    int panelWidth = 20;
+    int panelX = startX + titleWidth + 4;
     
-    graphicsLib->drawText(40, 10, "Game Libraries:");
-    auto gameLibs = _libManager->getGameLibraries();
-    for (size_t i = 0; i < gameLibs.size(); ++i) {
-        graphicsLib->drawText(40, 11 + i, gameLibs[i]);
+    // Graphics library panel
+    graphicsLib->drawBox(panelX, startY, panelWidth, 5, Color::CYAN);
+    graphicsLib->drawText(panelX + 2, startY + 1, "Graphics Library", Color::GREEN);
+    graphicsLib->drawText(panelX + 2, startY + 2, graphicsLib->getName(), Color::WHITE);
+    
+    // Game library panel
+    graphicsLib->drawBox(panelX, startY + 6, panelWidth, 5, Color::CYAN);
+    graphicsLib->drawText(panelX + 2, startY + 7, "Game Library", Color::GREEN);
+    auto gameLib = _libManager->getCurrentGameLibrary();
+    if (gameLib) {
+        graphicsLib->drawText(panelX + 2, startY + 8, gameLib->getName(), Color::WHITE);
     }
     
     // Draw player name
-    graphicsLib->drawText(10, 15, "Player: " + _playerName);
+    std::string playerInfo = "Player: " + _playerName;
+    graphicsLib->drawText(startX + 2, startY - 2, playerInfo, Color::YELLOW);
+    
+    // Draw controls
+    int controlsY = graphicsLib->getHeight() - 4;
+    graphicsLib->drawText(2, controlsY, "Controls: Arrow Keys=Navigate | Enter=Select | 9=Next Lib | 7=Next Game", Color::GREEN);
+    graphicsLib->drawText(2, controlsY + 1, "R=Restart | Q=Menu | E=Exit", Color::GREEN);
+    
+    graphicsLib->refresh();
 }
 
 void Core::handleGameInput(int key) {
@@ -234,10 +254,6 @@ void Core::renderGame() {
         // Return to menu
         _state = AppState::MENU;
     }
-}
-
-void Core::displayError(const std::string& message) {
-    std::cerr << "Error: " << message << std::endl;
 }
 
 AppState Core::getState() const {

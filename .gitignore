@@ -8,3 +8,17 @@ lib/*
 lib/
 lib
 arcade
+*.so
+*.dylib
+*.dll
+*.lib
+*.exp
+*.def
+*.manifest
+*.o
+*.a
+*.lib
+*.exp
+*.def
+*.manifest
+*.o

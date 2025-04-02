@@ -5,45 +5,70 @@
 ** IGraphicsLibrary
 */
 
-#ifndef I_GRAPHICS_LIBRARY_HPP
-#define I_GRAPHICS_LIBRARY_HPP
+#pragma once
 
 #include <string>
 #include <vector>
 
 namespace arcd {
 
-    class IGraphicsLibrary {
-        public:
-            virtual ~IGraphicsLibrary() = default;
+// Define color constants that can be used by any graphics library
+enum class Color {
+    DEFAULT,
+    BLACK,
+    RED,
+    GREEN,
+    YELLOW,
+    BLUE,
+    MAGENTA,
+    CYAN,
+    WHITE
+};
 
-            // Initialization and cleanup
-            virtual bool initialize() = 0;
-            virtual void cleanup() = 0;
+class IGraphicsLibrary {
+    public:
+        virtual ~IGraphicsLibrary() = default;
 
-            // Display functions
-            virtual void clear() = 0;
-            virtual void refresh() = 0;
+        // Key constants
+        static constexpr int KEY_ESC_CODE = 27;
+        static constexpr int KEY_UP_CODE = 259;
+        static constexpr int KEY_DOWN_CODE = 258;
+        static constexpr int KEY_LEFT_CODE = 260;
+        static constexpr int KEY_RIGHT_CODE = 261;
+        static constexpr int KEY_ENTER_CODE = 10;
+        static constexpr int KEY_BACKSPACE_CODE = 127;
+        static constexpr int KEY_NEXT_LIB_CODE = '9';
+        static constexpr int KEY_NEXT_GAME_CODE = '7';
 
-            // Drawing functions
-            virtual void drawText(int x, int y, const std::string& text) = 0;
-            virtual void drawBox(int x, int y, int width, int height) = 0;
-            virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex) = 0;
+        // Initialization and cleanup
+        virtual bool initialize() = 0;
+        virtual void cleanup() = 0;
 
-            // Input handling
-            virtual int getKey() = 0;
+        // Display functions
+        virtual void clear() = 0;
+        virtual void refresh() = 0;
 
-            // Player name input
-            virtual void getPlayerName(std::string& playerName) = 0;
+        // Drawing functions with color support
+        virtual void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) = 0;
+        virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
+        virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
 
-            // Library information
-            virtual std::string getName() const = 0;
-    };
+        // Input handling - should return standardized key codes
+        virtual int getKey() = 0;
 
-    // Function signature for the create/destroy functions that must be in the library
-    typedef IGraphicsLibrary* (*create_graphics_t)();
-    typedef void (*destroy_graphics_t)(IGraphicsLibrary*);
+        // Player name input
+        virtual void getPlayerName(std::string& playerName) = 0;
+
+        // Library information
+        virtual std::string getName() const = 0;
+
+        // Window dimensions
+        virtual int getWidth() const = 0;
+        virtual int getHeight() const = 0;
+};
+
+// Function signature for the create/destroy functions that must be in the library
+typedef IGraphicsLibrary* (*create_graphics_t)();
+typedef void (*destroy_graphics_t)(IGraphicsLibrary*);
 
 }
-
-#endif // I_GRAPHICS_LIBRARY_HPP

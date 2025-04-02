@@ -22,28 +22,22 @@ namespace arcd {
         // Unload any previously loaded library
         unload();
         
-        std::cerr << "DEBUG: DLLoader attempting to load: " << path << std::endl;
         
         // Try to open the library
         _handle = dlopen(path.c_str(), RTLD_LAZY);
         if (!_handle) {
             _error = dlerror();
-            std::cerr << "DEBUG: DLLoader error: " << _error << std::endl;
             return false;
         }
         
-        std::cerr << "DEBUG: DLLoader successfully loaded library" << std::endl;
         return true;
     }
 
     void* DLLoader::getSymbol(const std::string& symbolName) {
         if (!_handle) {
             _error = "No library loaded";
-            std::cerr << "DEBUG: DLLoader error: " << _error << std::endl;
             return nullptr;
         }
-        
-        std::cerr << "DEBUG: DLLoader looking for symbol: " << symbolName << std::endl;
         
         // Clear any existing error
         dlerror();
@@ -53,11 +47,9 @@ namespace arcd {
         const char* dlsymError = dlerror();
         if (dlsymError) {
             _error = dlsymError;
-            std::cerr << "DEBUG: DLLoader symbol error: " << _error << std::endl;
             return nullptr;
         }
         
-        std::cerr << "DEBUG: DLLoader found symbol successfully" << std::endl;
         return symbol;
     }
 

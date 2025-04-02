@@ -18,96 +18,32 @@
 #include <poll.h>
 #include <map>
 #include <sstream>
+#include <ncurses.h>
 
 namespace arcd {
 
-// Define key constants for better readability
-constexpr int KEY_UP = 259;
-constexpr int KEY_DOWN = 258;
-constexpr int KEY_LEFT = 260;
-constexpr int KEY_RIGHT = 261;
-constexpr int KEY_ENTER = 10;
-constexpr int KEY_ESC = 27;
-constexpr int KEY_BACKSPACE = 127;
-
-// ANSI color codes
-struct Color {
-    static const std::string RESET;
-    static const std::string BLACK;
-    static const std::string RED;
-    static const std::string GREEN;
-    static const std::string YELLOW;
-    static const std::string BLUE;
-    static const std::string MAGENTA;
-    static const std::string CYAN;
-    static const std::string WHITE;
-    static const std::string BRIGHT_BLACK;
-    static const std::string BRIGHT_RED;
-    static const std::string BRIGHT_GREEN;
-    static const std::string BRIGHT_YELLOW;
-    static const std::string BRIGHT_BLUE;
-    static const std::string BRIGHT_MAGENTA;
-    static const std::string BRIGHT_CYAN;
-    static const std::string BRIGHT_WHITE;
-    static const std::string BOLD;
-    
-    static std::string fg(int color);
-    static std::string bg(int color);
-};
-
-const std::string Color::RESET = "\033[0m";
-const std::string Color::BLACK = "\033[30m";
-const std::string Color::RED = "\033[31m";
-const std::string Color::GREEN = "\033[32m";
-const std::string Color::YELLOW = "\033[33m";
-const std::string Color::BLUE = "\033[34m";
-const std::string Color::MAGENTA = "\033[35m";
-const std::string Color::CYAN = "\033[36m";
-const std::string Color::WHITE = "\033[37m";
-const std::string Color::BRIGHT_BLACK = "\033[90m";
-const std::string Color::BRIGHT_RED = "\033[91m";
-const std::string Color::BRIGHT_GREEN = "\033[92m";
-const std::string Color::BRIGHT_YELLOW = "\033[93m";
-const std::string Color::BRIGHT_BLUE = "\033[94m";
-const std::string Color::BRIGHT_MAGENTA = "\033[95m";
-const std::string Color::BRIGHT_CYAN = "\033[96m";
-const std::string Color::BRIGHT_WHITE = "\033[97m";
-const std::string Color::BOLD = "\033[1m";
-
-std::string Color::fg(int color) {
-    return "\033[38;5;" + std::to_string(color) + "m";
-}
-
-std::string Color::bg(int color) {
-    return "\033[48;5;" + std::to_string(color) + "m";
+namespace AnsiColors {
+    const std::string RESET = "\033[0m";
+    const std::string BOLD = "\033[1m";
+    const std::string BRIGHT_BLACK = "\033[90m";
+    const std::string BRIGHT_RED = "\033[91m";
+    const std::string BRIGHT_GREEN = "\033[92m";
+    const std::string BRIGHT_YELLOW = "\033[93m";
+    const std::string BRIGHT_BLUE = "\033[94m";
+    const std::string BRIGHT_MAGENTA = "\033[95m";
+    const std::string BRIGHT_CYAN = "\033[96m";
+    const std::string BRIGHT_WHITE = "\033[97m";
 }
 
 // Box drawing characters
-struct BoxChars {
-    static const std::string TOP_LEFT;
-    static const std::string TOP_RIGHT;
-    static const std::string BOTTOM_LEFT;
-    static const std::string BOTTOM_RIGHT;
-    static const std::string HORIZONTAL;
-    static const std::string VERTICAL;
-    static const std::string T_DOWN;
-    static const std::string T_UP;
-    static const std::string T_RIGHT;
-    static const std::string T_LEFT;
-    static const std::string CROSS;
-};
-
-const std::string BoxChars::TOP_LEFT = "╔";
-const std::string BoxChars::TOP_RIGHT = "╗";
-const std::string BoxChars::BOTTOM_LEFT = "╚";
-const std::string BoxChars::BOTTOM_RIGHT = "╝";
-const std::string BoxChars::HORIZONTAL = "═";
-const std::string BoxChars::VERTICAL = "║";
-const std::string BoxChars::T_DOWN = "╦";
-const std::string BoxChars::T_UP = "╩";
-const std::string BoxChars::T_RIGHT = "╠";
-const std::string BoxChars::T_LEFT = "╣";
-const std::string BoxChars::CROSS = "╬";
+namespace BoxChars {
+    const std::string TOP_LEFT = "┌";
+    const std::string TOP_RIGHT = "┐";
+    const std::string BOTTOM_LEFT = "└";
+    const std::string BOTTOM_RIGHT = "┘";
+    const std::string HORIZONTAL = "─";
+    const std::string VERTICAL = "│";
+}
 
 NcursesGraphics::NcursesGraphics() : 
     _initialized(false), 
@@ -116,11 +52,6 @@ NcursesGraphics::NcursesGraphics() :
     _lastKey(0),
     _frameCounter(0)
 {
-    // Get terminal size
-    updateTerminalSize();
-    
-    // Save original terminal settings
-    tcgetattr(STDIN_FILENO, &_oldTermios);
 }
 
 NcursesGraphics::~NcursesGraphics()
@@ -129,373 +60,256 @@ NcursesGraphics::~NcursesGraphics()
 }
 
 void NcursesGraphics::updateTerminalSize() {
-    struct winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
-        _width = ws.ws_col;
-        _height = ws.ws_row;
-    }
+    if (!_initialized) return;
+    getmaxyx(stdscr, _height, _width);
 }
 
 bool NcursesGraphics::initialize()
 {
     if (_initialized) return true;
     
-    // Configure terminal for raw input mode
-    struct termios newTermios = _oldTermios;
-    newTermios.c_lflag &= ~(ICANON | ECHO);
-    newTermios.c_cc[VMIN] = 0;
-    newTermios.c_cc[VTIME] = 0;
-    tcsetattr(STDIN_FILENO, TCSANOW, &newTermios);
+    // Initialize ncurses with proper settings
+    setlocale(LC_ALL, "");  // Enable UTF-8
+    initscr();              // Initialize ncurses
+    raw();                  // Disable line buffering
+    noecho();              // Don't echo keypresses
+    curs_set(0);           // Hide cursor
+    keypad(stdscr, TRUE);  // Enable keypad input
+    nodelay(stdscr, TRUE); // Non-blocking input
+    start_color();         // Enable colors
+    use_default_colors();  // Use terminal's default colors
     
-    // Set non-blocking input
-    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-    fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+    // Initialize color pairs
+    init_pair(1, COLOR_BLACK, -1);
+    init_pair(2, COLOR_RED, -1);
+    init_pair(3, COLOR_GREEN, -1);
+    init_pair(4, COLOR_YELLOW, -1);
+    init_pair(5, COLOR_BLUE, -1);
+    init_pair(6, COLOR_MAGENTA, -1);
+    init_pair(7, COLOR_CYAN, -1);
+    init_pair(8, COLOR_WHITE, -1);
     
-    // Hide cursor and clear screen
-    std::cout << "\033[?25l" << "\033[2J" << "\033[H";
-    std::cout.flush();
+    // Get terminal size
+    updateTerminalSize();
     
     _initialized = true;
-    
-    // Show splash screen
-    showSplashScreen();
-    
     return true;
 }
 
 void NcursesGraphics::cleanup()
 {
     if (!_initialized) return;
-    
-    // Reset terminal
-    std::cout << "\033[0m" << "\033[?25h" << "\033[2J" << "\033[H";
-    std::cout.flush();
-    
-    // Restore terminal settings
-    tcsetattr(STDIN_FILENO, TCSANOW, &_oldTermios);
-    
+    clear();
+    refresh();
+    endwin();
     _initialized = false;
 }
 
 void NcursesGraphics::clear()
 {
     if (!_initialized) return;
-    std::cout << "\033[2J" << "\033[H";
+    erase();
 }
 
 void NcursesGraphics::refresh()
 {
     if (!_initialized) return;
-    
-    // Check if terminal size has changed
     updateTerminalSize();
-    
-    std::cout.flush();
-    _frameCounter++;
+    ::refresh();
 }
 
-void NcursesGraphics::drawText(int x, int y, const std::string& text)
+void NcursesGraphics::drawText(int x, int y, const std::string& text, Color color)
+{
+    if (!_initialized) return;
+    attron(COLOR_PAIR(static_cast<int>(color)));
+    mvaddstr(y, x, text.c_str());
+    attroff(COLOR_PAIR(static_cast<int>(color)));
+}
+
+void NcursesGraphics::drawTextCentered(int y, const std::string& text, Color color) {
+    if (!_initialized) return;
+    int x = (_width - text.length()) / 2;
+    drawText(x, y, text, color);
+}
+
+void NcursesGraphics::drawBox(int x, int y, int width, int height, Color color)
 {
     if (!_initialized) return;
     
-    // Check boundaries
-    if (y < 0 || y >= _height || x < 0) return;
+    attron(COLOR_PAIR(static_cast<int>(color)));
     
-    // Move cursor and output text
-    std::cout << "\033[" << (y+1) << ";" << (x+1) << "H" << text;
+    // Box corners
+    mvaddstr(y, x, "┌");
+    mvaddstr(y, x + width - 1, "┐");
+    mvaddstr(y + height - 1, x, "└");
+    mvaddstr(y + height - 1, x + width - 1, "┘");
+    
+    // Horizontal lines
+    for (int i = x + 1; i < x + width - 1; i++) {
+        mvaddstr(y, i, "─");
+        mvaddstr(y + height - 1, i, "─");
+    }
+    
+    // Vertical lines
+    for (int i = y + 1; i < y + height - 1; i++) {
+        mvaddstr(i, x, "│");
+        mvaddstr(i, x + width - 1, "│");
+    }
+    
+    attroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
-void NcursesGraphics::drawTextCentered(int y, const std::string& text)
-{
-    drawText(_width/2 - text.length()/2, y, text);
-}
-
-void NcursesGraphics::drawBox(int x, int y, int width, int height)
-{
+void NcursesGraphics::drawBoxWithTitle(int x, int y, int width, int height, const std::string& title, Color color) {
     if (!_initialized) return;
-    
-    // Validate dimensions
-    if (width < 2 || height < 2) return;
-    
-    // Ensure box fits in the screen
-    width = std::min(width, _width - x);
-    height = std::min(height, _height - y);
-    
-    if (width < 2 || height < 2) return;
-    
-    // Top border
-    drawText(x, y, BoxChars::TOP_LEFT);
-    for (int i = 1; i < width - 1; i++) {
-        drawText(x + i, y, BoxChars::HORIZONTAL);
-    }
-    drawText(x + width - 1, y, BoxChars::TOP_RIGHT);
-    
-    // Sides
-    for (int j = 1; j < height - 1; j++) {
-        drawText(x, y + j, BoxChars::VERTICAL);
-        drawText(x + width - 1, y + j, BoxChars::VERTICAL);
-    }
-    
-    // Bottom border
-    drawText(x, y + height - 1, BoxChars::BOTTOM_LEFT);
-    for (int i = 1; i < width - 1; i++) {
-        drawText(x + i, y + height - 1, BoxChars::HORIZONTAL);
-    }
-    drawText(x + width - 1, y + height - 1, BoxChars::BOTTOM_RIGHT);
+    drawBox(x, y, width, height, color);
+    int titleX = x + (width - title.length()) / 2;
+    drawText(titleX, y, title, color);
 }
 
-void NcursesGraphics::drawBoxWithTitle(int x, int y, int width, int height, const std::string& title)
-{
-    drawBox(x, y, width, height);
-    
-    // Draw title if it fits
-    if (title.length() + 4 < (size_t)width) {
-        std::string titleText = " " + title + " ";
-        drawText(x + (width - titleText.length()) / 2, y, titleText);
-    }
-}
-
-void NcursesGraphics::drawFilledBox(int x, int y, int width, int height, char fillChar)
-{
+void NcursesGraphics::drawFilledBox(int x, int y, int width, int height, char fillChar, Color color) {
     if (!_initialized) return;
-    
-    // Validate dimensions and boundaries
-    if (width <= 0 || height <= 0 || x < 0 || y < 0 || 
-        x >= _width || y >= _height) return;
-    
-    // Ensure box fits in the screen
-    width = std::min(width, _width - x);
-    height = std::min(height, _height - y);
-    
-    std::string line(width, fillChar);
-    for (int j = 0; j < height; j++) {
-        drawText(x, y + j, line);
-    }
-}
-
-void NcursesGraphics::drawHorizontalLine(int x, int y, int width)
-{
-    if (!_initialized) return;
-    
-    // Validate input
-    if (y < 0 || y >= _height || x < 0 || width <= 0) return;
-    
-    // Ensure line fits in the screen
-    width = std::min(width, _width - x);
-    
-    std::string line(width, '-');
-    drawText(x, y, line);
-}
-
-void NcursesGraphics::drawVerticalLine(int x, int y, int height)
-{
-    if (!_initialized) return;
-    
-    // Validate input
-    if (x < 0 || x >= _width || y < 0 || height <= 0) return;
-    
-    // Ensure line fits in the screen
-    height = std::min(height, _height - y);
-    
+    attron(COLOR_PAIR(static_cast<int>(color)));
     for (int i = 0; i < height; i++) {
-        drawText(x, y + i, "|");
+        for (int j = 0; j < width; j++) {
+            mvprintw(y + i, x + j, "%c", fillChar);
+        }
     }
+    attroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
-void NcursesGraphics::drawList([[maybe_unused]] int x, [[maybe_unused]] int y, 
-                              const std::vector<std::string>& items, int selectedIndex)
-{
-    if (!_initialized || items.empty()) return;
-    
-    // Clear first
-    clear();
-    
-    // Draw decorative frame around the entire screen
-    std::cout << Color::BRIGHT_BLUE;
-    drawBox(1, 1, _width - 2, _height - 2);
-    std::cout << Color::RESET;
-    
-    // Title with decorative elements
-    std::string title = "✧ ARCADE SYSTEM ✧";
-    std::cout << Color::BRIGHT_CYAN << Color::BOLD;
-    drawBoxWithTitle(_width/2 - 20, 3, 40, 3, title);
-    
-    // Display player info - we can't access private members directly
-    std::string playerInfo = "PLAYER: GUEST";
-    drawTextCentered(7, playerInfo);
-    std::cout << Color::RESET;
-    
-    // Menu items with enhanced visual style
-    const int boxWidth = 40;
-    const int boxHeight = 3;
-    const int spacing = 1;
-    const int startY = 10;
-    
-    // Draw menu items
-    for (size_t i = 0; i < items.size(); i++) {
-        int itemY = startY + i * (boxHeight + spacing);
-        
-        if ((int)i == selectedIndex) {
-            // Selected item with highlight effect
-            std::cout << Color::BRIGHT_YELLOW << Color::BOLD;
-            drawFilledBox(_width/2 - boxWidth/2 - 1, itemY - 1, boxWidth + 2, boxHeight + 2, ' ');
-            drawBox(_width/2 - boxWidth/2, itemY, boxWidth, boxHeight);
-            
-            // Add selection indicator
-            drawText(_width/2 - boxWidth/2 - 3, itemY + 1, "►");
-            drawText(_width/2 + boxWidth/2 + 1, itemY + 1, "◄");
-        } else {
-            // Unselected item
-            std::cout << Color::BRIGHT_WHITE;
-            drawBox(_width/2 - boxWidth/2, itemY, boxWidth, boxHeight);
-        }
-        
-        // Draw item text
-        drawTextCentered(itemY + 1, items[i]);
-        std::cout << Color::RESET;
+void NcursesGraphics::drawHorizontalLine(int x, int y, int length, Color color) {
+    if (!_initialized) return;
+    attron(COLOR_PAIR(static_cast<int>(color)));
+    for (int i = 0; i < length; i++) {
+        mvprintw(y, x + i, "─");
     }
+    attroff(COLOR_PAIR(static_cast<int>(color)));
+}
+
+void NcursesGraphics::drawVerticalLine(int x, int y, int height, Color color) {
+    if (!_initialized) return;
+    attron(COLOR_PAIR(static_cast<int>(color)));
+    for (int i = 0; i < height; i++) {
+        mvprintw(y + i, x, "│");
+    }
+    attroff(COLOR_PAIR(static_cast<int>(color)));
+}
+
+void NcursesGraphics::drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color)
+{
+    if (!_initialized) return;
     
-    // Game information section
-    std::cout << Color::BRIGHT_GREEN;
-    drawTextCentered(_height - 8, "ARCADE SYSTEM");
-    std::cout << Color::RESET;
-    
-    // Draw controls with better styling
-    std::cout << Color::BRIGHT_MAGENTA;
-    drawBox(2, _height - 6, _width - 4, 4);
-    std::cout << Color::RESET << Color::BOLD;
-    
-    drawTextCentered(_height - 5, "↑/↓: Navigate | Enter: Select | Q: Quit");
-    drawTextCentered(_height - 4, "9: Switch Graphics | 7: Switch Game | P: Player Profile");
-    std::cout << Color::RESET;
-    
-    // Draw current graphics library info
-    std::string libInfo = "GRAPHICS: " + getName();
-    std::cout << Color::BRIGHT_CYAN;
-    drawText(3, 2, libInfo);
-    std::cout << Color::RESET;
-    
-    refresh();
+    for (size_t i = 0; i < items.size(); i++) {
+        if (static_cast<int>(i) == selectedIndex) {
+            attron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+            mvaddstr(y + i, x, "> ");
+            mvaddstr(y + i, x + 2, items[i].c_str());
+            attroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+        } else {
+            attron(COLOR_PAIR(static_cast<int>(color)));
+            mvaddstr(y + i, x, "  ");
+            mvaddstr(y + i, x + 2, items[i].c_str());
+            attroff(COLOR_PAIR(static_cast<int>(color)));
+        }
+    }
 }
 
 void NcursesGraphics::getPlayerName(std::string& playerName)
 {
     if (!_initialized) return;
     
-    // Clear screen and setup
     clear();
     
-    const int boxWidth = 40;
-    const int boxHeight = 5;
-    const int boxX = _width/2 - boxWidth/2;
-    const int boxY = _height/2 - boxHeight/2;
+    // Draw title box
+    int boxWidth = 40;
+    int boxHeight = 3;
+    int startX = (_width - boxWidth) / 2;
+    int startY = (_height - boxHeight) / 2 - 2;
     
-    // Title
-    std::cout << Color::BRIGHT_CYAN << Color::BOLD;
-    drawBoxWithTitle(boxX, boxY - 4, boxWidth, 3, "ENTER PLAYER NAME");
-    std::cout << Color::RESET;
+    // Draw header
+    drawBoldText(startX + (boxWidth - 16) / 2, startY - 2, "Enter Your Name:", Color::CYAN);
     
-    // Input box
-    std::cout << Color::BRIGHT_WHITE;
-    drawBox(boxX, boxY, boxWidth, boxHeight);
-    std::cout << Color::RESET;
+    // Draw input box
+    drawBox(startX, startY, boxWidth, boxHeight, Color::WHITE);
     
-    // Instructions
-    std::string instructions = "Enter your name (max 15 chars):";
-    drawTextCentered(boxY + 1, instructions);
+    // Enable input mode
+    curs_set(1);  // Show cursor
+    echo();       // Show typed characters
     
-    // Status
-    std::string status = "Press ENTER to confirm, ESC to cancel";
-    drawTextCentered(boxY + boxHeight + 2, status);
+    // Move cursor to input position
+    int inputX = startX + 2;
+    int inputY = startY + 1;
+    move(inputY, inputX);
+    refresh();
     
-    // Input handling
-    const int inputX = boxX + 5;
-    const int inputY = boxY + 3;
-    std::string input = playerName;
-    const size_t maxLength = 15;
+    // Get input
+    char input[256];
+    memset(input, 0, sizeof(input));
     
-    bool done = false;
-    while (!done) {
-        // Display input with cursor
-        std::string spaces(maxLength + 1, ' ');
-        drawText(inputX, inputY, spaces);
-        
-        // Show input with blinking cursor
-        std::string displayText = input;
-        if (_frameCounter % 20 < 10) {
-            displayText += "_";
-        } else {
-            displayText += " ";
-        }
-        drawText(inputX, inputY, displayText);
-        
-        refresh();
-        
-        // Get input
-        int key = waitForKey(50); // 50ms timeout for smoother cursor blinking
-        
-        if (key == KEY_ENTER) {
-            done = true;
-        } else if (key == KEY_ESC) {
-            input = playerName; // Restore original
-            done = true;
-        } else if (key == KEY_BACKSPACE) {
-            if (!input.empty()) {
-                input.pop_back();
+    // Configure input field
+    WINDOW* inputWin = newwin(1, boxWidth - 4, inputY, inputX);
+    keypad(inputWin, TRUE);
+    
+    // Read input
+    int ch;
+    int pos = 0;
+    while ((ch = wgetch(inputWin)) != '\n' && ch != KEY_ENTER && ch != KEY_ESC_CODE) {
+        if (ch == KEY_BACKSPACE || ch == 127) {
+            if (pos > 0) {
+                pos--;
+                input[pos] = '\0';
+                mvwaddch(inputWin, 0, pos, ' ');
+                wmove(inputWin, 0, pos);
+                wrefresh(inputWin);
             }
-        } else if (key >= 32 && key <= 126) { // Printable ASCII
-            if (input.length() < maxLength) {
-                input += static_cast<char>(key);
-            }
+        } else if (pos < static_cast<int>(sizeof(input) - 1) && isprint(ch)) {
+            input[pos] = ch;
+            pos++;
+            input[pos] = '\0';
         }
-        
-        _frameCounter++;
+        wrefresh(inputWin);
     }
     
-    // Update player name if not empty
-    if (!input.empty()) {
+    // Restore terminal settings
+    noecho();
+    curs_set(0);
+    
+    // Update player name if input is not empty
+    if (pos > 0) {
         playerName = input;
     }
     
+    // Clean up
+    delwin(inputWin);
     clear();
+    refresh();
 }
 
 int NcursesGraphics::getKey()
 {
     if (!_initialized) return 0;
     
-    char buffer[8] = {0};
-    int bytesRead = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
+    int ch = getch();
+    if (ch == ERR) return 0;
     
-    if (bytesRead <= 0) return 0;
-    
-    // Handle escape sequences for arrow keys
-    if (bytesRead >= 3 && buffer[0] == 27 && buffer[1] == '[') {
-        switch (buffer[2]) {
-            case 'A': return KEY_UP;    // Up arrow
-            case 'B': return KEY_DOWN;  // Down arrow
-            case 'C': return KEY_RIGHT; // Right arrow
-            case 'D': return KEY_LEFT;  // Left arrow
-        }
+    switch (ch) {
+        case KEY_UP: return KEY_UP_CODE;
+        case KEY_DOWN: return KEY_DOWN_CODE;
+        case KEY_LEFT: return KEY_LEFT_CODE;
+        case KEY_RIGHT: return KEY_RIGHT_CODE;
+        case 27: return KEY_ESC_CODE;
+        case KEY_BACKSPACE: return KEY_BACKSPACE_CODE;
+        case 10: return KEY_ENTER_CODE;
+        case '9': return KEY_NEXT_LIB_CODE;
+        case '7': return KEY_NEXT_GAME_CODE;
+        default: return ch;
     }
-    
-    // Handle regular keys
-    if (bytesRead == 1) {
-        switch (buffer[0]) {
-            case 27:  return KEY_ESC;      // ESC
-            case 127: return KEY_BACKSPACE; // Backspace
-            case 10:  return KEY_ENTER;     // Enter
-            default:  return buffer[0];    // Regular character
-        }
-    }
-    
-    return 0;
 }
 
 void NcursesGraphics::flushInputBuffer()
 {
     if (!_initialized) return;
-    tcflush(STDIN_FILENO, TCIFLUSH);
+    flushinp();  // Use ncurses flushinp instead of tcflush
 }
 
 void NcursesGraphics::initColors()
@@ -518,65 +332,21 @@ void NcursesGraphics::showSplashScreen()
 {
     if (!_initialized) return;
     
-    const std::vector<std::string> logo = {
-        "    █████╗ ██████╗  ██████╗ █████╗ ██████╗ ███████╗    ",
-        "   ██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝    ",
-        "   ███████║██████╔╝██║     ███████║██║  ██║█████╗      ",
-        "   ██╔══██║██╔══██╗██║     ██╔══██║██║  ██║██╔══╝      ",
-        "   ██║  ██║██║  ██║╚██████╗██║  ██║██████╔╝███████╗    ",
-        "   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═════╝ ╚══════╝    "
-    };
-    
-    const int logoWidth = logo[0].length();
-    const int logoHeight = logo.size();
-    const int boxWidth = logoWidth + 4;
-    const int boxHeight = logoHeight + 4;
-    const int boxX = _width/2 - boxWidth/2;
-    const int boxY = _height/2 - boxHeight/2;
-    
-    // Animation effect
-    for (int frame = 0; frame < 5; frame++) {
-        clear();
-        
-        // Draw animated border
-        std::cout << Color::BRIGHT_CYAN;
-        drawBox(boxX, boxY, boxWidth, boxHeight);
-        std::cout << Color::RESET;
-        
-        // Draw logo with color that changes based on frame
-        int colorCode = 31 + (frame % 6); // Cycle through colors
-        std::cout << "\033[1;" << colorCode << "m";
-        
-        for (int i = 0; i < logoHeight; i++) {
-            drawText(boxX + 2, boxY + 2 + i, logo[i]);
-        }
-        
-        // Welcome message
-        std::cout << Color::BRIGHT_WHITE << Color::BOLD;
-        drawTextCentered(boxY + boxHeight + 2, "Welcome to the Arcade System!");
-        drawTextCentered(boxY + boxHeight + 4, "Press any key to start...");
-        
-        // Controls
-        std::cout << Color::BRIGHT_GREEN;
-        std::string controls = "CONTROLS: Arrow Keys=Navigate | Enter=Select | 9=Next Lib | 7=Next Game";
-        drawTextCentered(_height - 4, controls);
-        
-        std::string controls2 = "R=Restart | Q=Menu | E=Exit";
-        drawTextCentered(_height - 3, controls2);
-        
-        std::cout << Color::RESET;
-        refresh();
-        
-        // Brief pause between frames
-        struct timespec ts = {0, 200000000}; // 200ms
-        nanosleep(&ts, NULL);
-    }
-    
-    // Wait for keypress
-    waitForAnyKey();
-    
-    // Clear screen before returning
     clear();
+    
+    // Draw title box
+    int titleWidth = 40;
+    int titleHeight = 3;
+    int startX = (_width - titleWidth) / 2;
+    int startY = (_height - titleHeight) / 2;
+    
+    drawBox(startX, startY, titleWidth, titleHeight, Color::CYAN);
+    drawBoldText(startX + (titleWidth - 6) / 2, startY + 1, "ARCADE", Color::CYAN);
+    
+    refresh();
+    napms(2000);
+    clear();
+    refresh();
 }
 
 // Helper function to wait for specific key with timeout
@@ -605,28 +375,64 @@ void NcursesGraphics::waitForAnyKey()
 }
 
 // Draw a progress bar
-void NcursesGraphics::drawProgressBar(int x, int y, int width, int value, int maxValue)
+void NcursesGraphics::drawProgressBar(int x, int y, int width, int value, int maxValue, Color color) {
+    if (!_initialized) return;
+    int progress = static_cast<int>((static_cast<float>(value) / maxValue) * (width - 2));
+    attron(COLOR_PAIR(static_cast<int>(color)));
+    mvprintw(y, x, "[");
+    for (int i = 0; i < progress; i++) {
+        mvprintw(y, x + 1 + i, "=");
+    }
+    for (int i = progress; i < width - 2; i++) {
+        mvprintw(y, x + 1 + i, " ");
+    }
+    mvprintw(y, x + width - 1, "]");
+    attroff(COLOR_PAIR(static_cast<int>(color)));
+}
+
+// ColorMapper implementation
+std::string ColorMapper::getAnsiCode(Color color) {
+    switch (color) {
+        case Color::BLACK: return "\033[30m";
+        case Color::RED: return "\033[31m";
+        case Color::GREEN: return "\033[32m";
+        case Color::YELLOW: return "\033[33m";
+        case Color::BLUE: return "\033[34m";
+        case Color::MAGENTA: return "\033[35m";
+        case Color::CYAN: return "\033[36m";
+        case Color::WHITE: return "\033[37m";
+        default: return AnsiColors::RESET;
+    }
+}
+
+std::string ColorMapper::getBrightAnsiCode(Color color) {
+    switch (color) {
+        case Color::BLACK: return AnsiColors::BRIGHT_BLACK;
+        case Color::RED: return AnsiColors::BRIGHT_RED;
+        case Color::GREEN: return AnsiColors::BRIGHT_GREEN;
+        case Color::YELLOW: return AnsiColors::BRIGHT_YELLOW;
+        case Color::BLUE: return AnsiColors::BRIGHT_BLUE;
+        case Color::MAGENTA: return AnsiColors::BRIGHT_MAGENTA;
+        case Color::CYAN: return AnsiColors::BRIGHT_CYAN;
+        case Color::WHITE: return AnsiColors::BRIGHT_WHITE;
+        default: return AnsiColors::RESET;
+    }
+}
+
+std::string ColorMapper::getBold() {
+    return AnsiColors::BOLD;
+}
+
+std::string ColorMapper::getReset() {
+    return AnsiColors::RESET;
+}
+
+void NcursesGraphics::drawBoldText(int x, int y, const std::string& text, Color color)
 {
     if (!_initialized) return;
-    
-    // Validate dimensions
-    if (width < 3) return;
-    
-    // Calculate progress
-    int progress = static_cast<int>((static_cast<float>(value) / maxValue) * (width - 2));
-    progress = std::min(progress, width - 2);
-    
-    // Draw border
-    drawText(x, y, "[");
-    drawText(x + width - 1, y, "]");
-    
-    // Draw progress bar
-    std::string progressBar(progress, '=');
-    if (progress < width - 2) {
-        progressBar += '>';
-        progressBar += std::string(width - 3 - progress, ' ');
-    }
-    drawText(x + 1, y, progressBar);
+    attron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+    mvaddstr(y, x, text.c_str());
+    attroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
 }
 
 } // namespace arcd
