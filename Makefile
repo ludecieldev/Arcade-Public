@@ -18,7 +18,7 @@ CORE_OBJ = $(CORE_SRC:.cpp=.o)
 CORE_NAME = arcade
 
 # Game sources
-GAME_SRC = # Add game sources here
+GAME_SRC = src/games/SnakeGame.cpp
 GAME_LIBS = $(patsubst src/games/%.cpp,lib/arcade_%.so,$(GAME_SRC))
 
 # Graphics sources

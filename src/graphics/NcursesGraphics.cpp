@@ -99,10 +99,28 @@ bool NcursesGraphics::initialize()
 void NcursesGraphics::cleanup()
 {
     if (!_initialized) return;
+    
+    // Clear the screen and refresh one last time
     clear();
     refresh();
+    
+    // Disable ncurses mode
+    keypad(stdscr, FALSE);
+    nocbreak();
+    echo();
+    
+    // End ncurses
     endwin();
+    
+    // Reset terminal state
+    curs_set(1);  // Show cursor
+    
     _initialized = false;
+    _width = 80;
+    _height = 24;
+    _lastKey = 0;
+    _frameCounter = 0;
+    _colorPairs.clear();
 }
 
 void NcursesGraphics::clear()

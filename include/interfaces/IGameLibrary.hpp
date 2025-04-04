@@ -5,8 +5,7 @@
 ** IGameLibrary
 */
 
-#ifndef I_GAME_LIBRARY_HPP
-#define I_GAME_LIBRARY_HPP
+#pragma once
 
 #include "IGraphicsLibrary.hpp"
 #include <string>
@@ -18,30 +17,27 @@ public:
     virtual ~IGameLibrary() = default;
 
     // Game lifecycle
-    virtual bool initialize() = 0;
-    virtual void cleanup() = 0;
+    virtual void initialize() = 0;
+    virtual void update() = 0;
     virtual void restart() = 0;
-
-    // Game loop
-    virtual void update(float deltaTime) = 0;
-    virtual void render(IGraphicsLibrary* graphicsLib) = 0;
+    virtual void cleanup() = 0;
 
     // Input handling
     virtual void handleInput(int key) = 0;
 
+    // Rendering
+    virtual void render(IGraphicsLibrary* graphicsLib) = 0;
+
     // Game state
     virtual bool isGameOver() const = 0;
     virtual int getScore() const = 0;
-
-    // Game information
     virtual std::string getName() const = 0;
-    virtual std::string getDescription() const = 0;
 };
 
-// Function signature for the create/destroy functions that must be in the library
-typedef IGameLibrary* (*create_game_t)();
-typedef void (*destroy_game_t)(IGameLibrary*);
+} // namespace arcd
 
+// Dynamic library entry points
+extern "C" {
+    arcd::IGameLibrary* createGameLibrary();
+    void destroyGameLibrary(arcd::IGameLibrary* gameLib);
 }
-
-#endif // I_GAME_LIBRARY_HPP

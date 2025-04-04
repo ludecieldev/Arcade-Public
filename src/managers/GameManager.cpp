@@ -22,21 +22,11 @@ GameManager::~GameManager()
 bool GameManager::setGame(IGameLibrary* game)
 {
     if (!game) {
+        _lastError = "Invalid game library";
         return false;
     }
-    
+
     _currentGame = game;
-    
-    // Initialize the game
-    if (!_currentGame->initialize()) {
-        _currentGame = nullptr;
-        return false;
-    }
-    
-    // Reset the timer
-    _lastUpdateTime = std::chrono::high_resolution_clock::now();
-    _isPaused = false;
-    
     return true;
 }
 
@@ -72,27 +62,20 @@ bool GameManager::isPaused() const
 
 void GameManager::update()
 {
-    if (!_currentGame || _isPaused) {
+    if (!_currentGame) {
         return;
     }
-    
-    // Calculate delta time
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float deltaTime = std::chrono::duration<float>(currentTime - _lastUpdateTime).count();
-    _lastUpdateTime = currentTime;
-    
-    // Update the game
-    _currentGame->update(deltaTime);
+
+    _currentGame->update();
 }
 
-void GameManager::render(IGraphicsLibrary* graphicsLib)
+void GameManager::render(IGraphicsLibrary* graphics)
 {
-    if (!_currentGame || !graphicsLib) {
+    if (!_currentGame || !graphics) {
         return;
     }
-    
-    // Let the game render itself
-    _currentGame->render(graphicsLib);
+
+    _currentGame->render(graphics);
 }
 
 void GameManager::handleInput(int key)
@@ -100,42 +83,44 @@ void GameManager::handleInput(int key)
     if (!_currentGame) {
         return;
     }
-    
-    // Handle pause/resume
-    if (key == 'p') {
-        if (_isPaused) {
-            resumeGame();
-        } else {
-            pauseGame();
-        }
-        return;
-    }
-    
-    // Handle restart
-    if (key == 'r') {
-        resetGame();
-        return;
-    }
-    
-    // Pass other keys to the game if not paused
-    if (!_isPaused) {
-        _currentGame->handleInput(key);
-    }
+
+    _currentGame->handleInput(key);
 }
 
 bool GameManager::isGameOver() const
 {
-    return _currentGame ? _currentGame->isGameOver() : true;
+    if (!_currentGame) {
+        return true;
+    }
+
+    return _currentGame->isGameOver();
 }
 
 int GameManager::getScore() const
 {
-    return _currentGame ? _currentGame->getScore() : 0;
+    if (!_currentGame) {
+        return 0;
+    }
+
+    return _currentGame->getScore();
 }
 
-std::string GameManager::getGameName() const
+std::string GameManager::getName() const
 {
-    return _currentGame ? _currentGame->getName() : "No Game";
+    if (!_currentGame) {
+        return "No Game";
+    }
+
+    return _currentGame->getName();
+}
+
+void GameManager::restart()
+{
+    if (!_currentGame) {
+        return;
+    }
+
+    _currentGame->restart();
 }
 
 } // namespace arcd

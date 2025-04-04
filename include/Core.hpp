@@ -19,6 +19,8 @@ namespace arcd {
     enum class AppState {
         MENU,
         GAME,
+        SELECT_GAME,
+        SELECT_GRAPHICS,
         EXIT
     };
 
@@ -32,11 +34,19 @@ namespace arcd {
 
             // Menu options
             int _selectedMenuOption;
+            int _selectedSubMenuOption;
             std::vector<std::string> _menuOptions;
+            std::vector<std::string> _gameOptions;
+            std::vector<std::string> _graphicsOptions;
             void initializeMenu();
+            void updateLibraryLists();
 
             void handleMenuInput(int key);
+            void handleGameSelectionInput(int key);
+            void handleGraphicsSelectionInput(int key);
             void renderMenu();
+            void renderGameSelection();
+            void renderGraphicsSelection();
 
             void handleGameInput(int key);
             void renderGame();

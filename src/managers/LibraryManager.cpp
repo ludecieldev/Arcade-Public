@@ -12,9 +12,11 @@
 namespace arcd {
 
 LibraryManager::LibraryManager(const std::string& libDirectory)
-    : _libDirectory(libDirectory), _currentGraphicsLib(nullptr), _currentGameLib(nullptr)
+    : _libDirectory(libDirectory), _currentGraphicsLib(nullptr), _currentGameLib(nullptr),
+      _currentGraphicsIndex(0), _currentGameIndex(0)
 {
-    _loader = std::make_unique<DLLoader>();
+    _graphicsLoader = std::make_unique<DLLoader>();
+    _gameLoader = std::make_unique<DLLoader>();
 }
 
 LibraryManager::~LibraryManager()
@@ -35,19 +37,22 @@ void LibraryManager::scanLibraries()
                 std::string name = entry.path().filename().string();
                 
                 // Try to load the library to check its type
-                if (_loader->load(path)) {
+                if (_graphicsLoader->load(path)) {
                     // Check if it's a graphics library
-                    void* createGraphicsSymbol = _loader->getSymbol("createGraphicsLibrary");
+                    void* createGraphicsSymbol = _graphicsLoader->getSymbol("createGraphicsLibrary");
                     if (createGraphicsSymbol) {
                         _graphicsLibs[name] = path;
-                    } else {
-                        // Check if it's a game library
-                        void* createGameSymbol = _loader->getSymbol("createGameLibrary");
-                        if (createGameSymbol) {
-                            _gameLibs[name] = path;
-                        }
                     }
-                    _loader->unload();
+                    _graphicsLoader->unload();
+                }
+                
+                if (_gameLoader->load(path)) {
+                    // Check if it's a game library
+                    void* createGameSymbol = _gameLoader->getSymbol("createGameLibrary");
+                    if (createGameSymbol) {
+                        _gameLibs[name] = path;
+                    }
+                    _gameLoader->unload();
                 }
             }
         }
@@ -90,16 +95,16 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
     }
     
     // Load the library
-    if (!_loader->load(path)) {
-        _lastError = "Failed to load graphics library: " + _loader->getError();
+    if (!_graphicsLoader->load(path)) {
+        _lastError = "Failed to load graphics library: " + _graphicsLoader->getError();
         return false;
     }
     
     // Get the create function
-    void* createSymbol = _loader->getSymbol("createGraphicsLibrary");
+    void* createSymbol = _graphicsLoader->getSymbol("createGraphicsLibrary");
     if (!createSymbol) {
-        _lastError = "Invalid graphics library: " + _loader->getError();
-        _loader->unload();
+        _lastError = "Invalid graphics library: " + _graphicsLoader->getError();
+        _graphicsLoader->unload();
         return false;
     }
     
@@ -108,7 +113,7 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
     _currentGraphicsLib = createFunc();
     if (!_currentGraphicsLib) {
         _lastError = "Failed to create graphics library instance";
-        _loader->unload();
+        _graphicsLoader->unload();
         return false;
     }
     
@@ -130,38 +135,23 @@ IGraphicsLibrary* LibraryManager::getCurrentGraphicsLibrary() const
     }
     
     // Verify the library is still valid
-    if (!_loader->isLoaded()) {
+    if (!_graphicsLoader->isLoaded()) {
         return nullptr;
     }
     
     return _currentGraphicsLib;
 }
 
-bool LibraryManager::switchToNextGraphicsLibrary()
+bool LibraryManager::loadNextGraphicsLibrary()
 {
+    // Implementation of graphics library switching
     if (_graphicsLibs.empty()) {
         _lastError = "No graphics libraries available";
         return false;
     }
-    
-    // Find the current library in the map
-    auto it = _graphicsLibs.begin();
-    if (!_currentGraphicsLibPath.empty()) {
-        for (; it != _graphicsLibs.end(); ++it) {
-            if (it->second == _currentGraphicsLibPath) {
-                ++it;
-                break;
-            }
-        }
-        
-        // If we reached the end, wrap around
-        if (it == _graphicsLibs.end()) {
-            it = _graphicsLibs.begin();
-        }
-    }
-    
-    // Load the next library
-    return loadGraphicsLibrary(it->first);
+
+    _currentGraphicsIndex = (_currentGraphicsIndex + 1) % _graphicsLibs.size();
+    return loadGraphicsLibrary(_graphicsLibs.begin()->first);
 }
 
 bool LibraryManager::loadGameLibrary(const std::string& name)
@@ -179,16 +169,16 @@ bool LibraryManager::loadGameLibrary(const std::string& name)
     }
     
     // Load the library
-    if (!_loader->load(path)) {
-        _lastError = "Failed to load game library: " + _loader->getError();
+    if (!_gameLoader->load(path)) {
+        _lastError = "Failed to load game library: " + _gameLoader->getError();
         return false;
     }
     
     // Get the create function
-    void* createSymbol = _loader->getSymbol("createGameLibrary");
+    void* createSymbol = _gameLoader->getSymbol("createGameLibrary");
     if (!createSymbol) {
-        _lastError = "Invalid game library: " + _loader->getError();
-        _loader->unload();
+        _lastError = "Invalid game library: " + _gameLoader->getError();
+        _gameLoader->unload();
         return false;
     }
     
@@ -197,7 +187,7 @@ bool LibraryManager::loadGameLibrary(const std::string& name)
     _currentGameLib = createFunc();
     if (!_currentGameLib) {
         _lastError = "Failed to create game library instance";
-        _loader->unload();
+        _gameLoader->unload();
         return false;
     }
     
@@ -210,30 +200,19 @@ IGameLibrary* LibraryManager::getCurrentGameLibrary() const
     return _currentGameLib;
 }
 
-bool LibraryManager::switchToNextGameLibrary()
+bool LibraryManager::loadNextGameLibrary()
 {
+    // Implementation of game library switching
     if (_gameLibs.empty()) {
         _lastError = "No game libraries available";
         return false;
     }
+
+    _currentGameIndex = (_currentGameIndex + 1) % _gameLibs.size();
     
-    // Find the current library in the map
+    // Get the library name at the current index
     auto it = _gameLibs.begin();
-    if (!_currentGameLibPath.empty()) {
-        for (; it != _gameLibs.end(); ++it) {
-            if (it->second == _currentGameLibPath) {
-                ++it;
-                break;
-            }
-        }
-        
-        // If we reached the end, wrap around
-        if (it == _gameLibs.end()) {
-            it = _gameLibs.begin();
-        }
-    }
-    
-    // Load the next library
+    std::advance(it, _currentGameIndex);
     return loadGameLibrary(it->first);
 }
 
@@ -244,8 +223,8 @@ void LibraryManager::unloadCurrentGraphicsLibrary()
         _currentGraphicsLib->cleanup();
         
         // Get the destroy function
-        if (_loader->isLoaded()) {
-            void* destroySymbol = _loader->getSymbol("destroyGraphicsLibrary");
+        if (_graphicsLoader->isLoaded()) {
+            void* destroySymbol = _graphicsLoader->getSymbol("destroyGraphicsLibrary");
             if (destroySymbol) {
                 auto destroyFunc = reinterpret_cast<destroy_graphics_t>(destroySymbol);
                 destroyFunc(_currentGraphicsLib);
@@ -254,7 +233,7 @@ void LibraryManager::unloadCurrentGraphicsLibrary()
         
         _currentGraphicsLib = nullptr;
         _currentGraphicsLibPath = "";
-        _loader->unload();
+        _graphicsLoader->unload();
     }
 }
 
@@ -262,8 +241,8 @@ void LibraryManager::unloadCurrentGameLibrary()
 {
     if (_currentGameLib) {
         // Get the destroy function
-        if (_loader->isLoaded()) {
-            void* destroySymbol = _loader->getSymbol("destroyGameLibrary");
+        if (_gameLoader->isLoaded()) {
+            void* destroySymbol = _gameLoader->getSymbol("destroyGameLibrary");
             if (destroySymbol) {
                 auto destroyFunc = reinterpret_cast<destroy_game_t>(destroySymbol);
                 destroyFunc(_currentGameLib);
@@ -272,7 +251,7 @@ void LibraryManager::unloadCurrentGameLibrary()
         
         _currentGameLib = nullptr;
         _currentGameLibPath = "";
-        _loader->unload();
+        _gameLoader->unload();
     }
 }
 

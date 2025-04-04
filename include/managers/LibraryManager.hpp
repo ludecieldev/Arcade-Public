@@ -5,8 +5,7 @@
 ** LibraryManager
 */
 
-#ifndef LIBRARY_MANAGER_HPP
-#define LIBRARY_MANAGER_HPP
+#pragma once
 
 #include "../interfaces/ILibraryLoader.hpp"
 #include "../interfaces/IGraphicsLibrary.hpp"
@@ -16,13 +15,21 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <dlfcn.h>
 
 namespace arcd {
+
+    // Function types for dynamic loading
+    using create_graphics_t = IGraphicsLibrary* (*)();
+    using destroy_graphics_t = void (*)(IGraphicsLibrary*);
+    using create_game_t = IGameLibrary* (*)();
+    using destroy_game_t = void (*)(IGameLibrary*);
 
     class LibraryManager {
         private:
             std::string _libDirectory;
-            std::unique_ptr<ILibraryLoader> _loader;
+            std::unique_ptr<ILibraryLoader> _graphicsLoader;
+            std::unique_ptr<ILibraryLoader> _gameLoader;
             std::string _lastError;
 
             std::map<std::string, std::string> _graphicsLibs;
@@ -34,6 +41,9 @@ namespace arcd {
             IGameLibrary* _currentGameLib;
             std::string _currentGameLibPath;
 
+            size_t _currentGraphicsIndex;
+            size_t _currentGameIndex;
+
         public:
             LibraryManager(const std::string& libDirectory);
             ~LibraryManager();
@@ -43,24 +53,29 @@ namespace arcd {
             std::vector<std::string> getGraphicsLibraries() const;
             std::vector<std::string> getGameLibraries() const;
 
-            // Graphics library management
-            bool loadGraphicsLibrary(const std::string& name);
-            IGraphicsLibrary* getCurrentGraphicsLibrary() const;
-            bool switchToNextGraphicsLibrary();
-
-            // Game library management
-            bool loadGameLibrary(const std::string& name);
-            IGameLibrary* getCurrentGameLibrary() const;
-            bool switchToNextGameLibrary();
-
-            // Cleanup
+            // Library loading
+            bool loadGraphicsLibrary(const std::string& path);
+            bool loadGameLibrary(const std::string& path);
             void unloadCurrentGraphicsLibrary();
             void unloadCurrentGameLibrary();
 
+            // Library switching
+            bool loadNextGraphicsLibrary();
+            bool loadNextGameLibrary();
+
+            // Library access
+            IGraphicsLibrary* getCurrentGraphicsLibrary() const;
+            IGameLibrary* getCurrentGameLibrary() const;
+            std::string getCurrentGraphicsLibraryName() const;
+            std::string getCurrentGameLibraryName() const;
+
             // Error handling
             std::string getLastError() const;
+
+        private:
+            void discoverLibraries();
+            bool isGraphicsLibrary(const std::string& path) const;
+            bool isGameLibrary(const std::string& path) const;
     };
 
 }
-
-#endif // LIBRARY_MANAGER_HPP

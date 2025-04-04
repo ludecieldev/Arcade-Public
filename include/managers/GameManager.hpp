@@ -5,8 +5,7 @@
 ** GameManager
 */
 
-#ifndef GAME_MANAGER_HPP
-#define GAME_MANAGER_HPP
+#pragma once
 
 #include "../interfaces/IGameLibrary.hpp"
 #include "../interfaces/IGraphicsLibrary.hpp"
@@ -21,6 +20,7 @@ namespace arcd {
             IGameLibrary* _currentGame;
             std::chrono::time_point<std::chrono::high_resolution_clock> _lastUpdateTime;
             bool _isPaused;
+            std::string _lastError;
 
         public:
             GameManager();
@@ -46,9 +46,9 @@ namespace arcd {
             // Game information
             bool isGameOver() const;
             int getScore() const;
-            std::string getGameName() const;
+            std::string getName() const;
+            void restart();
+            std::string getLastError() const { return _lastError; }
     };
 
 }
-
-#endif // GAME_MANAGER_HPP

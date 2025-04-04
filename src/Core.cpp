@@ -22,9 +22,21 @@ Core::Core(const std::string& initialGraphicsLib)
     _gameManager = std::make_unique<GameManager>();
     _playerName = "Player";
     
+    // Scan for available libraries
+    _libManager->scanLibraries();
+    
+    // Load initial graphics library
     if (!_libManager->loadGraphicsLibrary(initialGraphicsLib)) {
         std::string error = "Failed to load initial graphics library: " + _libManager->getLastError();
         throw ArcadeError(error);
+    }
+    
+    // Load first available game library
+    auto gameLibs = _libManager->getGameLibraries();
+    if (!gameLibs.empty()) {
+        if (!_libManager->loadGameLibrary(gameLibs[0])) {
+            std::cerr << "Warning: Failed to load initial game library: " << _libManager->getLastError() << std::endl;
+        }
     }
     
     initializeMenu();
@@ -68,10 +80,21 @@ void Core::run()
             }
             
             // Handle input based on current state
-            if (_state == AppState::MENU) {
-                handleMenuInput(key);
-            } else if (_state == AppState::GAME) {
-                handleGameInput(key);
+            switch (_state) {
+                case AppState::MENU:
+                    handleMenuInput(key);
+                    break;
+                case AppState::GAME:
+                    handleGameInput(key);
+                    break;
+                case AppState::SELECT_GAME:
+                    handleGameSelectionInput(key);
+                    break;
+                case AppState::SELECT_GRAPHICS:
+                    handleGraphicsSelectionInput(key);
+                    break;
+                default:
+                    break;
             }
             
             // Update game state if in game mode
@@ -82,10 +105,21 @@ void Core::run()
             graphicsLib->clear();
             
             // Render based on current state
-            if (_state == AppState::MENU) {
-                renderMenu();
-            } else if (_state == AppState::GAME) {
-                renderGame();
+            switch (_state) {
+                case AppState::MENU:
+                    renderMenu();
+                    break;
+                case AppState::GAME:
+                    renderGame();
+                    break;
+                case AppState::SELECT_GAME:
+                    renderGameSelection();
+                    break;
+                case AppState::SELECT_GRAPHICS:
+                    renderGraphicsSelection();
+                    break;
+                default:
+                    break;
             }
             
             graphicsLib->refresh();
@@ -103,16 +137,25 @@ void Core::run()
 }
 
 void Core::cleanup() {
-    // Cleanup resources
+    // First, cleanup the graphics library
     if (_libManager) {
         auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
         if (graphicsLib) {
             graphicsLib->cleanup();
         }
         
-        _libManager->unloadCurrentGraphicsLibrary();
+        // Unload libraries in reverse order of loading
         _libManager->unloadCurrentGameLibrary();
+        _libManager->unloadCurrentGraphicsLibrary();
     }
+    
+    // Reset state
+    _state = AppState::EXIT;
+    
+    // Clear any remaining resources
+    _gameManager.reset();
+    _libManager.reset();
+    _scoreManager.reset();
 }
 
 void Core::initializeMenu() {
@@ -122,22 +165,32 @@ void Core::initializeMenu() {
         "Enter Name",
         "Exit"
     };
+    updateLibraryLists();
 }
 
-void Core::handleMenuInput(int key) {
+void Core::updateLibraryLists() {
+    _gameOptions = _libManager->getGameLibraries();
+    _graphicsOptions = _libManager->getGraphicsLibraries();
+    _selectedSubMenuOption = 0;
+}
+
+void Core::handleMenuInput(int key)
+{
     if (key == IGraphicsLibrary::KEY_ESC_CODE) {
         _state = AppState::EXIT;
     } else if (key == IGraphicsLibrary::KEY_UP_CODE) {
         _selectedMenuOption = (_selectedMenuOption > 0) ? _selectedMenuOption - 1 : 0;
     } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
         _selectedMenuOption = (_selectedMenuOption < static_cast<int>(_menuOptions.size()) - 1) ? 
-                             _selectedMenuOption + 1 : static_cast<int>(_menuOptions.size()) - 1;
+                            _selectedMenuOption + 1 : static_cast<int>(_menuOptions.size()) - 1;
     } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
         // Handle menu selection
         if (_selectedMenuOption == 0) { // Select Game
-            // TODO: Implement game selection
+            updateLibraryLists();
+            _state = AppState::SELECT_GAME;
         } else if (_selectedMenuOption == 1) { // Select Graphics Library
-            // TODO: Implement graphics library selection
+            updateLibraryLists();
+            _state = AppState::SELECT_GRAPHICS;
         } else if (_selectedMenuOption == 2) { // Enter Name
             auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
             if (graphicsLib) {
@@ -146,10 +199,45 @@ void Core::handleMenuInput(int key) {
         } else if (_selectedMenuOption == 3) { // Exit option
             _state = AppState::EXIT;
         }
-    } else if (key == '9') { // Switch graphics library
-        _libManager->switchToNextGraphicsLibrary();
-    } else if (key == '7') { // Switch game
-        _libManager->switchToNextGameLibrary();
+    }
+}
+
+void Core::handleGameSelectionInput(int key)
+{
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
+        _state = AppState::MENU;
+    } else if (key == IGraphicsLibrary::KEY_UP_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption > 0) ? _selectedSubMenuOption - 1 : 0;
+    } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption < static_cast<int>(_gameOptions.size()) - 1) ? 
+                                _selectedSubMenuOption + 1 : static_cast<int>(_gameOptions.size()) - 1;
+    } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+        if (!_gameOptions.empty()) {
+            if (_libManager->loadGameLibrary(_gameOptions[_selectedSubMenuOption])) {
+                auto gameLib = _libManager->getCurrentGameLibrary();
+                if (gameLib && _gameManager->setGame(gameLib)) {
+                    gameLib->initialize();
+                    _state = AppState::GAME;
+                }
+            }
+        }
+    }
+}
+
+void Core::handleGraphicsSelectionInput(int key)
+{
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
+        _state = AppState::MENU;
+    } else if (key == IGraphicsLibrary::KEY_UP_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption > 0) ? _selectedSubMenuOption - 1 : 0;
+    } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption < static_cast<int>(_graphicsOptions.size()) - 1) ? 
+                                _selectedSubMenuOption + 1 : static_cast<int>(_graphicsOptions.size()) - 1;
+    } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+        if (!_graphicsOptions.empty()) {
+            _libManager->loadGraphicsLibrary(_graphicsOptions[_selectedSubMenuOption]);
+        }
+        _state = AppState::MENU;
     }
 }
 
@@ -159,100 +247,261 @@ void Core::renderMenu() {
         return;
     }
     
-    graphicsLib->clear();
+    // Calculate dimensions with safety margins
+    int width = std::max(40, graphicsLib->getWidth());
+    int height = std::max(20, graphicsLib->getHeight());
     
-    // Draw title box
-    int titleWidth = 40;
+    // Draw title box with safe dimensions
+    int titleWidth = std::min(40, width - 6);  // Leave more margin
     int titleHeight = 3;
-    int startX = (graphicsLib->getWidth() - titleWidth) / 2;
-    int startY = (graphicsLib->getHeight() - titleHeight) / 2;
+    int startX = std::max(2, (width - titleWidth) / 2);
+    int startY = std::max(2, (height - titleHeight) / 2);
     
-    graphicsLib->drawBox(startX, startY, titleWidth, titleHeight, Color::CYAN);
-    graphicsLib->drawText(startX + (titleWidth - 6) / 2, startY + 1, "ARCADE", Color::CYAN);
-    
-    // Draw menu items
-    int menuStartY = startY + titleHeight + 2;
-    for (size_t i = 0; i < _menuOptions.size(); i++) {
-        std::string prefix = (i == static_cast<size_t>(_selectedMenuOption)) ? "> " : "  ";
-        graphicsLib->drawText(startX + 2, menuStartY + i, prefix + _menuOptions[i], Color::GREEN);
-    }
-    
-    // Draw side panels
-    int panelWidth = 20;
-    int panelX = startX + titleWidth + 4;
-    
-    // Graphics library panel
-    graphicsLib->drawBox(panelX, startY, panelWidth, 5, Color::CYAN);
-    graphicsLib->drawText(panelX + 2, startY + 1, "Graphics Library", Color::GREEN);
-    graphicsLib->drawText(panelX + 2, startY + 2, graphicsLib->getName(), Color::WHITE);
-    
-    // Game library panel
-    graphicsLib->drawBox(panelX, startY + 6, panelWidth, 5, Color::CYAN);
-    graphicsLib->drawText(panelX + 2, startY + 7, "Game Library", Color::GREEN);
-    auto gameLib = _libManager->getCurrentGameLibrary();
-    if (gameLib) {
-        graphicsLib->drawText(panelX + 2, startY + 8, gameLib->getName(), Color::WHITE);
-    }
-    
-    // Draw player name
-    std::string playerInfo = "Player: " + _playerName;
-    graphicsLib->drawText(startX + 2, startY - 2, playerInfo, Color::YELLOW);
-    
-    // Draw controls
-    int controlsY = graphicsLib->getHeight() - 4;
-    graphicsLib->drawText(2, controlsY, "Controls: Arrow Keys=Navigate | Enter=Select | 9=Next Lib | 7=Next Game", Color::GREEN);
-    graphicsLib->drawText(2, controlsY + 1, "R=Restart | Q=Menu | E=Exit", Color::GREEN);
-    
-    graphicsLib->refresh();
-}
-
-void Core::handleGameInput(int key) {
-    // Handle game input
-    auto gameLib = _libManager->getCurrentGameLibrary();
-    if (!gameLib) {
+    // Ensure we have enough space and margins
+    if (startX < 2 || startY < 2 || startY + titleHeight >= height - 2 || startX + titleWidth >= width - 2) {
         return;
     }
     
-    // Handle special keys for the arcade
-    if (key == 'q' || key == 'Q') {
+    // Draw title
+    graphicsLib->drawBox(startX, startY, titleWidth, titleHeight, Color::CYAN);
+    std::string title = "ARCADE";
+    int titleX = startX + (titleWidth - static_cast<int>(title.length())) / 2;
+    graphicsLib->drawText(titleX, startY + 1, title, Color::CYAN);
+    
+    // Draw menu items with safety checks
+    int menuStartY = startY + titleHeight + 2;
+    int maxItems = std::min(static_cast<int>(_menuOptions.size()), (height - menuStartY - 2));
+    
+    for (int i = 0; i < maxItems; i++) {
+        std::string prefix = (i == _selectedMenuOption) ? "> " : "  ";
+        std::string menuText = prefix + _menuOptions[i];
+        if (startX + 2 + static_cast<int>(menuText.length()) < width - 2) {
+            graphicsLib->drawText(startX + 2, menuStartY + i, menuText, Color::GREEN);
+        }
+    }
+    
+    // Draw side panels with strict bounds checking
+    int panelWidth = std::min(20, (width - titleWidth) / 2 - 6);
+    if (panelWidth >= 10) {  // Only draw if we have enough space
+        int panelX = std::min(width - panelWidth - 2, startX + titleWidth + 4);
+        
+        // Graphics library panel
+        if (startY + 6 < height - 2) {
+            graphicsLib->drawBox(panelX, startY, panelWidth, 5, Color::CYAN);
+            if (panelX + 2 + 8 < width - 2) {  // Check if text fits
+                graphicsLib->drawText(panelX + 2, startY + 1, "Graphics", Color::GREEN);
+                std::string name = graphicsLib->getName();
+                if (name.length() > static_cast<size_t>(panelWidth - 4)) {
+                    name = name.substr(0, panelWidth - 4);
+                }
+                graphicsLib->drawText(panelX + 2, startY + 2, name, Color::WHITE);
+            }
+        }
+        
+        // Game library panel
+        if (startY + 12 < height - 2) {
+            graphicsLib->drawBox(panelX, startY + 6, panelWidth, 5, Color::CYAN);
+            if (panelX + 2 + 4 < width - 2) {  // Check if text fits
+                graphicsLib->drawText(panelX + 2, startY + 7, "Game", Color::GREEN);
+                auto gameLib = _libManager->getCurrentGameLibrary();
+                if (gameLib) {
+                    std::string name = gameLib->getName();
+                    if (name.length() > static_cast<size_t>(panelWidth - 4)) {
+                        name = name.substr(0, panelWidth - 4);
+                    }
+                    graphicsLib->drawText(panelX + 2, startY + 8, name, Color::WHITE);
+                }
+            }
+        }
+    }
+    
+    // Draw player name with bounds checking
+    if (startY > 3) {
+        std::string playerInfo = "Player: " + _playerName;
+        if (playerInfo.length() > static_cast<size_t>(width - 4)) {
+            playerInfo = playerInfo.substr(0, width - 4);
+        }
+        graphicsLib->drawText(startX + 2, startY - 2, playerInfo, Color::YELLOW);
+    }
+    
+    // Draw controls with bounds checking
+    if (height > 8) {
+        int controlsY = height - 4;
+        std::string controls1 = "Controls: Arrows=Navigate | Enter=Select | ESC=Back";
+        std::string controls2 = "R=Restart | Q=Menu | E=Exit";
+        
+        if (controls1.length() < static_cast<size_t>(width - 4)) {
+            graphicsLib->drawText(2, controlsY, controls1, Color::GREEN);
+        }
+        if (controls2.length() < static_cast<size_t>(width - 4)) {
+            graphicsLib->drawText(2, controlsY + 1, controls2, Color::GREEN);
+        }
+    }
+}
+
+void Core::handleGameInput(int key)
+{
+    if (!_gameManager) {
         _state = AppState::MENU;
-    } else if (key == 'e' || key == 'E') {
-        _state = AppState::EXIT;
-    } else if (key == 'r' || key == 'R') {
-        // Restart game
-        gameLib->restart();
-    } else if (key == '9') {
-        // Switch graphics library
-        _libManager->switchToNextGraphicsLibrary();
-    } else if (key == '7') {
-        // Return to menu to switch games
-        _state = AppState::MENU;
-    } else {
-        // Pass other keys to the game
-        gameLib->handleInput(key);
+        return;
+    }
+
+    switch (key) {
+        case IGraphicsLibrary::KEY_LEFT_CODE:
+            _libManager->loadNextGraphicsLibrary();
+            break;
+        case IGraphicsLibrary::KEY_RIGHT_CODE:
+            _libManager->loadNextGameLibrary();
+            break;
+        case IGraphicsLibrary::KEY_ESC_CODE:
+            _state = AppState::MENU;
+            break;
+        case 'r':
+        case 'R':
+            if (_gameManager->isGameOver()) {
+                _gameManager->restart();
+            }
+            break;
+        case 'q':
+        case 'Q':
+            _state = AppState::MENU;
+            break;
+        case 'e':
+        case 'E':
+            _state = AppState::EXIT;
+            break;
+        default:
+            _gameManager->handleInput(key);
+            break;
     }
 }
 
 void Core::renderGame() {
     auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
-    auto gameLib = _libManager->getCurrentGameLibrary();
-    
-    if (!graphicsLib || !gameLib) {
+    if (!graphicsLib || !_gameManager) {
         return;
     }
     
     graphicsLib->clear();
     
     // Let the game render itself using the graphics library
-    gameLib->render(graphicsLib);
+    _gameManager->render(graphicsLib);
     
     // Check if game is over
-    if (gameLib->isGameOver()) {
+    if (_gameManager->isGameOver()) {
         // Add score
-        _scoreManager->addScore(_playerName, gameLib->getName(), gameLib->getScore());
+        _scoreManager->addScore(_playerName, _gameManager->getName(), _gameManager->getScore());
         
         // Return to menu
         _state = AppState::MENU;
+    }
+}
+
+void Core::renderGameSelection()
+{
+    auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
+    if (!graphicsLib) {
+        return;
+    }
+    
+    // Calculate dimensions with safety margins
+    int width = std::max(40, graphicsLib->getWidth());
+    int height = std::max(20, graphicsLib->getHeight());
+    
+    // Draw title with safe dimensions
+    int titleWidth = std::min(40, width - 6);
+    int titleHeight = 3;
+    int startX = std::max(2, (width - titleWidth) / 2);
+    int startY = std::max(2, (height - titleHeight) / 2);
+    
+    // Ensure we have enough space and margins
+    if (startX < 2 || startY < 2 || startY + titleHeight >= height - 2 || startX + titleWidth >= width - 2) {
+        return;
+    }
+    
+    graphicsLib->drawBox(startX, startY - 2, titleWidth, titleHeight, Color::CYAN);
+    std::string title = "Select Game";
+    int titleX = startX + (titleWidth - static_cast<int>(title.length())) / 2;
+    graphicsLib->drawText(titleX, startY - 1, title, Color::CYAN);
+    
+    // Draw game options with safety checks
+    int menuStartY = startY + 2;
+    if (_gameOptions.empty()) {
+        if (menuStartY < height - 2) {
+            graphicsLib->drawText(startX, menuStartY, "No games available", Color::RED);
+        }
+    } else {
+        int maxItems = std::min(static_cast<int>(_gameOptions.size()), (height - menuStartY - 2));
+        for (int i = 0; i < maxItems; i++) {
+            std::string prefix = (i == _selectedSubMenuOption) ? "> " : "  ";
+            std::string menuText = prefix + _gameOptions[i];
+            if (startX + static_cast<int>(menuText.length()) < width - 2) {
+                graphicsLib->drawText(startX, menuStartY + i, menuText, Color::GREEN);
+            }
+        }
+    }
+    
+    // Draw controls with bounds checking
+    if (height > 4) {
+        int controlsY = height - 2;
+        std::string controls = "ESC=Back | Enter=Select";
+        if (controls.length() < static_cast<size_t>(width - 4)) {
+            graphicsLib->drawText(2, controlsY, controls, Color::GREEN);
+        }
+    }
+}
+
+void Core::renderGraphicsSelection()
+{
+    auto graphicsLib = _libManager->getCurrentGraphicsLibrary();
+    if (!graphicsLib) {
+        return;
+    }
+    
+    // Calculate dimensions with safety margins
+    int width = std::max(40, graphicsLib->getWidth());
+    int height = std::max(20, graphicsLib->getHeight());
+    
+    // Draw title with safe dimensions
+    int titleWidth = std::min(40, width - 6);
+    int titleHeight = 3;
+    int startX = std::max(2, (width - titleWidth) / 2);
+    int startY = std::max(2, (height - titleHeight) / 2);
+    
+    // Ensure we have enough space and margins
+    if (startX < 2 || startY < 2 || startY + titleHeight >= height - 2 || startX + titleWidth >= width - 2) {
+        return;
+    }
+    
+    graphicsLib->drawBox(startX, startY - 2, titleWidth, titleHeight, Color::CYAN);
+    std::string title = "Select Graphics Library";
+    int titleX = startX + (titleWidth - static_cast<int>(title.length())) / 2;
+    graphicsLib->drawText(titleX, startY - 1, title, Color::CYAN);
+    
+    // Draw graphics options with safety checks
+    int menuStartY = startY + 2;
+    if (_graphicsOptions.empty()) {
+        if (menuStartY < height - 2) {
+            graphicsLib->drawText(startX, menuStartY, "No graphics libraries available", Color::RED);
+        }
+    } else {
+        int maxItems = std::min(static_cast<int>(_graphicsOptions.size()), (height - menuStartY - 2));
+        for (int i = 0; i < maxItems; i++) {
+            std::string prefix = (i == _selectedSubMenuOption) ? "> " : "  ";
+            std::string menuText = prefix + _graphicsOptions[i];
+            if (startX + static_cast<int>(menuText.length()) < width - 2) {
+                graphicsLib->drawText(startX, menuStartY + i, menuText, Color::GREEN);
+            }
+        }
+    }
+    
+    // Draw controls with bounds checking
+    if (height > 4) {
+        int controlsY = height - 2;
+        std::string controls = "ESC=Back | Enter=Select";
+        if (controls.length() < static_cast<size_t>(width - 4)) {
+            graphicsLib->drawText(2, controlsY, controls, Color::GREEN);
+        }
     }
 }
 
