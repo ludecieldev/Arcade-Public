@@ -23,11 +23,13 @@ GAME_LIBS = $(patsubst src/games/%.cpp,lib/arcade_%.so,$(GAME_SRC))
 
 # Graphics sources
 GRAPHICS_SRC = src/graphics/NcursesGraphics.cpp
+GRAPHICS_SRC += src/graphics/SDL2Graphics.cpp
+GRAPHICS_SRC += src/graphics/SFMLGraphics.cpp
 GRAPHICS_LIBS = $(patsubst src/graphics/%.cpp,lib/arcade_%.so,$(GRAPHICS_SRC))
 
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC -fno-gnu-unique
-LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system -lncurses -lSDL2
+LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system -lncurses -lSDL2 -lSDL2_ttf
 
 # Colors for output
 CYAN = \033[0;36m
