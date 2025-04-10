@@ -5,7 +5,8 @@
 ** LibraryManager
 */
 
-#pragma once
+#ifndef LIBRARY_MANAGER_HPP
+#define LIBRARY_MANAGER_HPP
 
 #include "../interfaces/ILibraryLoader.hpp"
 #include "../interfaces/IGraphicsLibrary.hpp"
@@ -83,3 +84,5 @@ namespace arcd {
     };
 
 }
+
+#endif // LIBRARY_MANAGER_HPP

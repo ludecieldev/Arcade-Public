@@ -5,7 +5,8 @@
 ** NcursesGraphics
 */
 
-#pragma once
+#ifndef NCURSES_GRAPHICS_HPP
+#define NCURSES_GRAPHICS_HPP
 
 #include "../interfaces/IGraphicsLibrary.hpp"
 #include "../Core.hpp"
@@ -102,3 +103,5 @@ extern "C" {
     std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary();
     void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib);
 }
+
+#endif // NCURSES_GRAPHICS_HPP

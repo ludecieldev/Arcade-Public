@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SNAKE_GAME_HPP
+#define SNAKE_GAME_HPP
 
 #include "../interfaces/IGameLibrary.hpp"
 #include <vector>
@@ -64,4 +65,6 @@ private:
     std::mt19937 _rng;
 };
 
-} // namespace arcd 
+} // namespace arcd
+
+#endif // SNAKE_GAME_HPP 

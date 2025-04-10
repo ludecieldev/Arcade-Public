@@ -5,7 +5,8 @@
 ** IGraphicsLibrary
 */
 
-#pragma once
+#ifndef I_GRAPHICS_LIBRARY_HPP
+#define I_GRAPHICS_LIBRARY_HPP
 
 #include <string>
 #include <vector>
@@ -79,3 +80,5 @@ extern "C" {
 }
 
 }
+
+#endif // I_GRAPHICS_LIBRARY_HPP

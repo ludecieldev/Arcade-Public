@@ -5,18 +5,19 @@
 ** SDL2Graphics
 */
 
-#pragma once
+#ifndef SDL2_GRAPHICS_HPP
+#define SDL2_GRAPHICS_HPP
 
 #include "../interfaces/IGraphicsLibrary.hpp"
 #include "../Core.hpp"
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <optional>
 #include <functional>
-#include <memory>
 
 namespace arcd {
 
@@ -90,4 +91,6 @@ class SDL2Graphics : public IGraphicsLibrary {
 extern "C" {
     std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary();
     void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib);
-} 
+}
+
+#endif // SDL2_GRAPHICS_HPP 

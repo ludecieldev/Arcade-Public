@@ -5,7 +5,8 @@
 ** IGameLibrary
 */
 
-#pragma once
+#ifndef I_GAME_LIBRARY_HPP
+#define I_GAME_LIBRARY_HPP
 
 #include "IGraphicsLibrary.hpp"
 #include <string>
@@ -42,3 +43,5 @@ extern "C" {
     std::unique_ptr<arcd::IGameLibrary> createGameLibrary();
     void destroyGameLibrary(arcd::IGameLibrary* gameLib); // Keep for compatibility
 }
+
+#endif // I_GAME_LIBRARY_HPP

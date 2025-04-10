@@ -5,7 +5,8 @@
 ** GameManager
 */
 
-#pragma once
+#ifndef GAME_MANAGER_HPP
+#define GAME_MANAGER_HPP
 
 #include "../interfaces/IGameLibrary.hpp"
 #include "../interfaces/IGraphicsLibrary.hpp"
@@ -54,3 +55,5 @@ namespace arcd {
     };
 
 }
+
+#endif // GAME_MANAGER_HPP
