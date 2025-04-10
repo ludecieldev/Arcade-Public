@@ -170,12 +170,12 @@ public:
 
 // Factory function to create a PlayerManager
 extern "C" {
-    IPlayerManager* createPlayerManager() {
-        return new PlayerManager();
+    std::unique_ptr<IPlayerManager> createPlayerManager() {
+        return std::make_unique<PlayerManager>();
     }
     
-    void destroyPlayerManager(IPlayerManager* manager) {
-        delete manager;
+    void destroyPlayerManager([[maybe_unused]] IPlayerManager* manager) {
+        // No need to delete with smart pointers
     }
 }
 

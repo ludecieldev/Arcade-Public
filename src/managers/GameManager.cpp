@@ -9,30 +9,38 @@
 
 namespace arcd {
 
-GameManager::GameManager() : _currentGame(nullptr), _isPaused(false)
+GameManager::GameManager() : _isPaused(false)
 {
     _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
 GameManager::~GameManager()
 {
-    // Note: We don't delete _currentGame here because it's managed by LibraryManager
+    // Smart pointer will automatically clean up
 }
 
-bool GameManager::setGame(IGameLibrary* game)
+bool GameManager::setGame(std::unique_ptr<IGameLibrary> game)
 {
     if (!game) {
         _lastError = "Invalid game library";
         return false;
     }
 
-    _currentGame = game;
+    _currentGame = std::move(game);
     return true;
 }
 
-IGameLibrary* GameManager::getCurrentGame() const
+IGameLibrary& GameManager::getCurrentGame()
 {
-    return _currentGame;
+    if (!_currentGame) {
+        throw std::runtime_error("No game is currently loaded");
+    }
+    return *_currentGame;
+}
+
+bool GameManager::hasGame() const
+{
+    return _currentGame != nullptr;
 }
 
 void GameManager::resetGame()
@@ -69,9 +77,9 @@ void GameManager::update()
     _currentGame->update();
 }
 
-void GameManager::render(IGraphicsLibrary* graphics)
+void GameManager::render(IGraphicsLibrary& graphics)
 {
-    if (!_currentGame || !graphics) {
+    if (!_currentGame) {
         return;
     }
 

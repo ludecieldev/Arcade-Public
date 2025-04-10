@@ -107,38 +107,36 @@ void SnakeGame::handleInput(int key)
     }
 }
 
-void SnakeGame::render(IGraphicsLibrary* graphicsLib)
+void SnakeGame::render(IGraphicsLibrary& graphicsLib)
 {
-    if (!graphicsLib) return;
-    
     // Calculate board position to center it
-    int startX = (graphicsLib->getWidth() - BOARD_WIDTH * 2) / 2;
-    int startY = (graphicsLib->getHeight() - BOARD_HEIGHT) / 2;
+    int startX = (graphicsLib.getWidth() - BOARD_WIDTH * 2) / 2;
+    int startY = (graphicsLib.getHeight() - BOARD_HEIGHT) / 2;
     
     // Draw border
-    graphicsLib->drawBox(startX - 1, startY - 1, BOARD_WIDTH * 2 + 2, BOARD_HEIGHT + 2, Color::CYAN);
+    graphicsLib.drawBox(startX - 1, startY - 1, BOARD_WIDTH * 2 + 2, BOARD_HEIGHT + 2, Color::CYAN);
     
     // Draw snake
     for (const auto& segment : _snake) {
         if (segment == _snake.front()) {
-            graphicsLib->drawText(startX + segment.x * 2, startY + segment.y, "██", Color::GREEN);
+            graphicsLib.drawText(startX + segment.x * 2, startY + segment.y, "██", Color::GREEN);
         } else {
-            graphicsLib->drawText(startX + segment.x * 2, startY + segment.y, "██", Color::WHITE);
+            graphicsLib.drawText(startX + segment.x * 2, startY + segment.y, "██", Color::WHITE);
         }
     }
     
     // Draw food
-    graphicsLib->drawText(startX + _food.x * 2, startY + _food.y, "██", Color::RED);
+    graphicsLib.drawText(startX + _food.x * 2, startY + _food.y, "██", Color::RED);
     
     // Draw score
     std::string scoreText = "Score: " + std::to_string(_score);
-    graphicsLib->drawText(startX, startY - 2, scoreText, Color::YELLOW);
+    graphicsLib.drawText(startX, startY - 2, scoreText, Color::YELLOW);
     
     // Draw game over message
     if (_gameOver) {
         std::string gameOverText = "Game Over! Press R to restart";
-        int textX = (graphicsLib->getWidth() - gameOverText.length()) / 2;
-        graphicsLib->drawText(textX, startY + BOARD_HEIGHT + 2, gameOverText, Color::RED);
+        int textX = (graphicsLib.getWidth() - gameOverText.length()) / 2;
+        graphicsLib.drawText(textX, startY + BOARD_HEIGHT + 2, gameOverText, Color::RED);
     }
 }
 
@@ -200,11 +198,12 @@ std::string SnakeGame::getName() const
 } // namespace arcd
 
 extern "C" {
-    arcd::IGameLibrary* createGameLibrary() {
-        return new arcd::SnakeGame();
+    std::unique_ptr<arcd::IGameLibrary> createGameLibrary() {
+        return std::make_unique<arcd::SnakeGame>();
     }
     
-    void destroyGameLibrary(arcd::IGameLibrary* gameLib) {
-        delete gameLib;
+    void destroyGameLibrary([[maybe_unused]] arcd::IGameLibrary* gameLib) {
+        // With smart pointers, this function is not needed anymore
+        // but we keep it for compatibility
     }
 } 

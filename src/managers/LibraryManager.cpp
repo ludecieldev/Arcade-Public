@@ -12,8 +12,7 @@
 namespace arcd {
 
 LibraryManager::LibraryManager(const std::string& libDirectory)
-    : _libDirectory(libDirectory), _currentGraphicsLib(nullptr), _currentGameLib(nullptr),
-      _currentGraphicsIndex(0), _currentGameIndex(0)
+    : _libDirectory(libDirectory), _currentGraphicsIndex(0), _currentGameIndex(0)
 {
     _graphicsLoader = std::make_unique<DLLoader>();
     _gameLoader = std::make_unique<DLLoader>();
@@ -100,16 +99,15 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
         return false;
     }
     
-    // Get the create function
-    void* createSymbol = _graphicsLoader->getSymbol("createGraphicsLibrary");
-    if (!createSymbol) {
+    // Get the create function using the type-safe template method
+    auto createFunc = _graphicsLoader->getSymbolAs<create_graphics_t>("createGraphicsLibrary");
+    if (!createFunc) {
         _lastError = "Invalid graphics library: " + _graphicsLoader->getError();
         _graphicsLoader->unload();
         return false;
     }
     
     // Create the graphics library instance
-    auto createFunc = reinterpret_cast<create_graphics_t>(createSymbol);
     _currentGraphicsLib = createFunc();
     if (!_currentGraphicsLib) {
         _lastError = "Failed to create graphics library instance";
@@ -128,18 +126,18 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
     return true;
 }
 
-IGraphicsLibrary* LibraryManager::getCurrentGraphicsLibrary() const
+IGraphicsLibrary& LibraryManager::getCurrentGraphicsLibrary()
 {
-    if (!_currentGraphicsLib) {
-        return nullptr;
+    if (!_currentGraphicsLib || !_graphicsLoader->isLoaded()) {
+        throw std::runtime_error("No graphics library loaded");
     }
     
-    // Verify the library is still valid
-    if (!_graphicsLoader->isLoaded()) {
-        return nullptr;
-    }
-    
-    return _currentGraphicsLib;
+    return *_currentGraphicsLib;
+}
+
+bool LibraryManager::hasGraphicsLibrary() const
+{
+    return _currentGraphicsLib != nullptr && _graphicsLoader->isLoaded();
 }
 
 bool LibraryManager::loadNextGraphicsLibrary()
@@ -151,7 +149,11 @@ bool LibraryManager::loadNextGraphicsLibrary()
     }
 
     _currentGraphicsIndex = (_currentGraphicsIndex + 1) % _graphicsLibs.size();
-    return loadGraphicsLibrary(_graphicsLibs.begin()->first);
+    
+    // Get the library name at the current index
+    auto it = _graphicsLibs.begin();
+    std::advance(it, _currentGraphicsIndex);
+    return loadGraphicsLibrary(it->first);
 }
 
 bool LibraryManager::loadGameLibrary(const std::string& name)
@@ -174,16 +176,15 @@ bool LibraryManager::loadGameLibrary(const std::string& name)
         return false;
     }
     
-    // Get the create function
-    void* createSymbol = _gameLoader->getSymbol("createGameLibrary");
-    if (!createSymbol) {
+    // Get the create function using type-safe method
+    auto createFunc = _gameLoader->getSymbolAs<create_game_t>("createGameLibrary");
+    if (!createFunc) {
         _lastError = "Invalid game library: " + _gameLoader->getError();
         _gameLoader->unload();
         return false;
     }
     
     // Create the game library instance
-    auto createFunc = reinterpret_cast<create_game_t>(createSymbol);
     _currentGameLib = createFunc();
     if (!_currentGameLib) {
         _lastError = "Failed to create game library instance";
@@ -195,9 +196,18 @@ bool LibraryManager::loadGameLibrary(const std::string& name)
     return true;
 }
 
-IGameLibrary* LibraryManager::getCurrentGameLibrary() const
+IGameLibrary& LibraryManager::getCurrentGameLibrary()
 {
-    return _currentGameLib;
+    if (!_currentGameLib || !_gameLoader->isLoaded()) {
+        throw std::runtime_error("No game library loaded");
+    }
+    
+    return *_currentGameLib;
+}
+
+bool LibraryManager::hasGameLibrary() const
+{
+    return _currentGameLib != nullptr && _gameLoader->isLoaded();
 }
 
 bool LibraryManager::loadNextGameLibrary()
@@ -219,39 +229,46 @@ bool LibraryManager::loadNextGameLibrary()
 void LibraryManager::unloadCurrentGraphicsLibrary()
 {
     if (_currentGraphicsLib) {
-        // Call cleanup before destroying
-        _currentGraphicsLib->cleanup();
-        
-        // Get the destroy function
-        if (_graphicsLoader->isLoaded()) {
-            void* destroySymbol = _graphicsLoader->getSymbol("destroyGraphicsLibrary");
-            if (destroySymbol) {
-                auto destroyFunc = reinterpret_cast<destroy_graphics_t>(destroySymbol);
-                destroyFunc(_currentGraphicsLib);
-            }
+        try {
+            // Call cleanup before destroying
+            _currentGraphicsLib->cleanup();
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Error during graphics library cleanup: " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "Warning: Unknown error during graphics library cleanup" << std::endl;
         }
         
-        _currentGraphicsLib = nullptr;
+        // Reset the unique_ptr which will handle destruction
+        _currentGraphicsLib.reset();
         _currentGraphicsLibPath = "";
-        _graphicsLoader->unload();
+        
+        // Unload the actual shared library
+        if (_graphicsLoader && _graphicsLoader->isLoaded()) {
+            _graphicsLoader->unload();
+        }
     }
 }
 
 void LibraryManager::unloadCurrentGameLibrary()
 {
     if (_currentGameLib) {
-        // Get the destroy function
-        if (_gameLoader->isLoaded()) {
-            void* destroySymbol = _gameLoader->getSymbol("destroyGameLibrary");
-            if (destroySymbol) {
-                auto destroyFunc = reinterpret_cast<destroy_game_t>(destroySymbol);
-                destroyFunc(_currentGameLib);
-            }
+        try {
+            // Call cleanup before destroying to ensure proper resource release
+            _currentGameLib->cleanup();
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Error during game library cleanup: " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "Warning: Unknown error during game library cleanup" << std::endl;
         }
         
-        _currentGameLib = nullptr;
+        // Reset the unique_ptr which will handle destruction
+        _currentGameLib.reset();
         _currentGameLibPath = "";
-        _gameLoader->unload();
+        
+        // Unload the actual shared library
+        if (_gameLoader && _gameLoader->isLoaded()) {
+            _gameLoader->unload();
+        }
     }
 }
 

@@ -270,13 +270,14 @@ std::string SDL2Graphics::getName() const
 } // namespace arcd
 
 extern "C" {
-    arcd::IGraphicsLibrary* createGraphicsLibrary()
+    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary()
     {
-        return new arcd::SDL2Graphics();
+        return std::make_unique<arcd::SDL2Graphics>();
     }
 
-    void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib)
+    void destroyGraphicsLibrary([[maybe_unused]] arcd::IGraphicsLibrary* graphicsLib)
     {
-        delete graphicsLib;
+        // With smart pointers, this function is not needed anymore
+        // but we keep it for compatibility
     }
 } 

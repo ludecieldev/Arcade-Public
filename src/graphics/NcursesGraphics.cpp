@@ -456,11 +456,12 @@ void NcursesGraphics::drawBoldText(int x, int y, const std::string& text, Color 
 } // namespace arcd
 
 extern "C" {
-    arcd::IGraphicsLibrary* createGraphicsLibrary() {
-        return new arcd::NcursesGraphics();
+    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary() {
+        return std::make_unique<arcd::NcursesGraphics>();
     }
     
-    void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib) {
-        delete graphicsLib;
+    void destroyGraphicsLibrary([[maybe_unused]] arcd::IGraphicsLibrary* graphicsLib) {
+        // With smart pointers, this function is not needed anymore
+        // but we keep it for compatibility
     }
 }
