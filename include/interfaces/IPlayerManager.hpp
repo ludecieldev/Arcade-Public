@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 
 namespace arcd {
 
@@ -40,6 +41,12 @@ namespace arcd {
             virtual bool loadData() = 0;
     };
 
+}
+
+// Dynamic library entry points with smart pointers
+extern "C" {
+    std::unique_ptr<arcd::IPlayerManager> createPlayerManager();
+    void destroyPlayerManager(arcd::IPlayerManager* manager); // Keep for compatibility
 }
 
 #endif // IPLAYER_MANAGER_HPP

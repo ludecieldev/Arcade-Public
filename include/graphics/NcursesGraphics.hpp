@@ -99,6 +99,6 @@ class NcursesGraphics : public IGraphicsLibrary {
 }
 
 extern "C" {
-    arcd::IGraphicsLibrary* createGraphicsLibrary();
+    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary();
     void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib);
 }

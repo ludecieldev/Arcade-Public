@@ -16,6 +16,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <optional>
 #include <functional>
+#include <memory>
 
 namespace arcd {
 
@@ -87,6 +88,6 @@ class SDL2Graphics : public IGraphicsLibrary {
 }
 
 extern "C" {
-    arcd::IGraphicsLibrary* createGraphicsLibrary();
+    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary();
     void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib);
 } 

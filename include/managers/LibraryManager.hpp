@@ -19,10 +19,10 @@
 
 namespace arcd {
 
-    // Function types for dynamic loading
-    using create_graphics_t = IGraphicsLibrary* (*)();
+    // Function types for dynamic loading with smart pointers
+    using create_graphics_t = std::unique_ptr<IGraphicsLibrary> (*)();
     using destroy_graphics_t = void (*)(IGraphicsLibrary*);
-    using create_game_t = IGameLibrary* (*)();
+    using create_game_t = std::unique_ptr<IGameLibrary> (*)();
     using destroy_game_t = void (*)(IGameLibrary*);
 
     class LibraryManager {
@@ -35,10 +35,10 @@ namespace arcd {
             std::map<std::string, std::string> _graphicsLibs;
             std::map<std::string, std::string> _gameLibs;
 
-            IGraphicsLibrary* _currentGraphicsLib;
+            std::unique_ptr<IGraphicsLibrary> _currentGraphicsLib;
             std::string _currentGraphicsLibPath;
 
-            IGameLibrary* _currentGameLib;
+            std::unique_ptr<IGameLibrary> _currentGameLib;
             std::string _currentGameLibPath;
 
             size_t _currentGraphicsIndex;
@@ -64,10 +64,14 @@ namespace arcd {
             bool loadNextGameLibrary();
 
             // Library access
-            IGraphicsLibrary* getCurrentGraphicsLibrary() const;
-            IGameLibrary* getCurrentGameLibrary() const;
-            std::string getCurrentGraphicsLibraryName() const;
-            std::string getCurrentGameLibraryName() const;
+            IGraphicsLibrary& getCurrentGraphicsLibrary();
+            IGameLibrary& getCurrentGameLibrary();
+            std::string getCurrentGraphicsLibraryName() const { return _currentGraphicsLibPath; }
+            std::string getCurrentGameLibraryName() const { return _currentGameLibPath; }
+            
+            // Check if libraries are loaded
+            bool hasGraphicsLibrary() const;
+            bool hasGameLibrary() const;
 
             // Error handling
             std::string getLastError() const;

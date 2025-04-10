@@ -12,12 +12,13 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <stdexcept>
 
 namespace arcd {
 
     class GameManager {
         private:
-            IGameLibrary* _currentGame;
+            std::unique_ptr<IGameLibrary> _currentGame;
             std::chrono::time_point<std::chrono::high_resolution_clock> _lastUpdateTime;
             bool _isPaused;
             std::string _lastError;
@@ -27,8 +28,9 @@ namespace arcd {
             ~GameManager();
 
             // Game management
-            bool setGame(IGameLibrary* game);
-            IGameLibrary* getCurrentGame() const;
+            bool setGame(std::unique_ptr<IGameLibrary> game);
+            IGameLibrary& getCurrentGame();
+            bool hasGame() const;
             void resetGame();
 
             // Game state
@@ -38,7 +40,7 @@ namespace arcd {
 
             // Game loop
             void update();
-            void render(IGraphicsLibrary* graphicsLib);
+            void render(IGraphicsLibrary& graphicsLib);
 
             // Input handling
             void handleInput(int key);

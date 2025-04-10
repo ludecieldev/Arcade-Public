@@ -37,7 +37,7 @@ public:
     void handleInput(int key) override;
 
     // Rendering
-    void render(IGraphicsLibrary* graphicsLib) override;
+    void render(IGraphicsLibrary& graphicsLib) override;
 
     // Game state
     bool isGameOver() const override;

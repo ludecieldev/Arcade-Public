@@ -9,6 +9,7 @@
 
 #include "IGraphicsLibrary.hpp"
 #include <string>
+#include <memory>
 
 namespace arcd {
 
@@ -26,7 +27,7 @@ public:
     virtual void handleInput(int key) = 0;
 
     // Rendering
-    virtual void render(IGraphicsLibrary* graphicsLib) = 0;
+    virtual void render(IGraphicsLibrary& graphicsLib) = 0;
 
     // Game state
     virtual bool isGameOver() const = 0;
@@ -36,8 +37,8 @@ public:
 
 } // namespace arcd
 
-// Dynamic library entry points
+// Dynamic library entry points with smart pointers
 extern "C" {
-    arcd::IGameLibrary* createGameLibrary();
-    void destroyGameLibrary(arcd::IGameLibrary* gameLib);
+    std::unique_ptr<arcd::IGameLibrary> createGameLibrary();
+    void destroyGameLibrary(arcd::IGameLibrary* gameLib); // Keep for compatibility
 }

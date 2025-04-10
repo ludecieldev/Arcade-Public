@@ -9,6 +9,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace arcd {
 
@@ -67,8 +68,14 @@ class IGraphicsLibrary {
         virtual int getHeight() const = 0;
 };
 
-// Function signature for the create/destroy functions that must be in the library
-typedef IGraphicsLibrary* (*create_graphics_t)();
-typedef void (*destroy_graphics_t)(IGraphicsLibrary*);
+// Standard function for creating a unique_ptr to a graphics library
+using create_graphics_t = std::unique_ptr<IGraphicsLibrary> (*)();
+// Standard function for handling a graphics library (not needed with unique_ptr)
+using destroy_graphics_t = void (*)(IGraphicsLibrary*);
+// C-style function signatures for dynamic loading compatibility
+extern "C" {
+    std::unique_ptr<IGraphicsLibrary> createGraphicsLibrary();
+    void destroyGraphicsLibrary(IGraphicsLibrary* lib); // Keep for compatibility
+}
 
 }

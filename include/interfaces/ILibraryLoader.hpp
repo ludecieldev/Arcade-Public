@@ -9,6 +9,8 @@
 #define I_LIBRARY_LOADER_HPP
 
 #include <string>
+#include <memory>
+#include <type_traits>
 
 namespace arcd {
     class ILibraryLoader {
@@ -20,6 +22,13 @@ namespace arcd {
             virtual bool unload() = 0;
             virtual std::string getError() const = 0;
             virtual bool isLoaded() const = 0;
+            
+            // Template method for type-safe symbol loading
+            template<typename T>
+            T getSymbolAs(const std::string& symbol) {
+                static_assert(std::is_pointer<T>::value, "T must be a pointer type");
+                return reinterpret_cast<T>(getSymbol(symbol));
+            }
     };
 }
 
