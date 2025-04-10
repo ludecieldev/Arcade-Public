@@ -31,6 +31,9 @@ CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC -fno-gnu-unique
 LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system -lncurses -lSDL2 -lSDL2_ttf
 
+# Debug flags
+DEBUG_FLAGS = -g3
+
 # Colors for output
 CYAN = \033[0;36m
 GREEN = \033[0;32m
@@ -63,6 +66,14 @@ lib/arcade_%.so: src/graphics/%.cpp
 	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
 	@echo -e "${GREEN}Graphics library built: $@${NC}"
 
+debug: CXXFLAGS += $(DEBUG_FLAGS)
+debug: fclean all
+	@echo -e "${YELLOW}LUD'S MAKEFILE | ${BOLD_GREEN}Debug version built with $(DEBUG_FLAGS)${NC}"
+
+valgrind: debug
+	@echo -e "${YELLOW}LUD'S MAKEFILE | ${BOLD_GREEN}Running valgrind...${NC}"
+	@valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose ./$(CORE_NAME) ./lib/arcade_NcursesGraphics.so
+
 clean:
 	@rm -f $(CORE_OBJ) *.gcda *.gcno
 	@echo -e "${YELLOW}LUD'S MAKEFILE | ${RED}Cleaning object and coverage files...${NC}"
@@ -73,4 +84,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re core games graphics
+.PHONY: all clean fclean re core games graphics debug valgrind
