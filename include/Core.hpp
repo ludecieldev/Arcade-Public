@@ -18,6 +18,8 @@
 
 namespace arcd {
 
+    // CoreState est déjà défini dans ICore.hpp, pas besoin de le redéfinir ici
+    
     class Core : public ICore {
         private:
             std::unique_ptr<LibraryManager> _libManager;
@@ -25,18 +27,20 @@ namespace arcd {
             std::unique_ptr<GameManager> _gameManager;
             CoreState _state;
             std::string _playerName;
-            std::chrono::time_point<std::chrono::high_resolution_clock> _lastFrameTime;
-            double _deltaTime;
             
-            // Current game state cache
-            std::unique_ptr<IGameState> _currentGameState;
-
-            // Menu options
+            // Menu options - ces variables doivent être placées ici car elles sont initialisées dans le constructeur avant _deltaTime
             int _selectedMenuOption;
             int _selectedSubMenuOption;
             std::vector<std::string> _menuOptions;
             std::vector<std::string> _gameOptions;
             std::vector<std::string> _graphicsOptions;
+            
+            // Timing variables - doivent venir après les variables du menu
+            std::chrono::high_resolution_clock::time_point _lastFrameTime;
+            double _deltaTime;
+            
+            // Current game state cache
+            std::unique_ptr<IGameState> _currentGameState;
             
             // UI Elements
             std::vector<UIElement> _uiElements;
@@ -47,12 +51,14 @@ namespace arcd {
             void updateGameState();
             void updateUI();
             void calculateDeltaTime();
-            void processGameEvents();
+            void askPlayerName();
 
             // Event handling helpers
             void handleMenuEvent(const IEvent& event);
             void handleGameEvent(const IEvent& event);
             void handleGlobalEvent(const IEvent& event);
+            void handleSelectGameEvent(const IEvent& event);
+            void handleSelectGraphicsEvent(const IEvent& event);
 
         public:
             Core(const std::string& initialGraphicsLib);
@@ -62,6 +68,9 @@ namespace arcd {
             bool initialize() override;
             void run() override;
             void cleanup() override;
+            
+            // Event handling - ICore implementation
+            void processEvents() override;
 
             // Library management - ICore implementation
             bool loadGameLibrary(const std::string& path) override;
@@ -76,9 +85,6 @@ namespace arcd {
             // Core state - ICore implementation
             CoreState getState() const override;
             void setState(CoreState state) override;
-            
-            // Event handling - ICore implementation
-            void processEvent(const IEvent& event) override;
             
             // Game state handling - ICore implementation
             const IGameState* getCurrentGameState() const override;

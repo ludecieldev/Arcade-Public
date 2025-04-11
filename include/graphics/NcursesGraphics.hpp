@@ -46,6 +46,7 @@ class NcursesGraphics : public IGraphicsLibrary {
         void showSplashScreen();
         int waitForKey(int timeoutMs);
         void waitForAnyKey();
+        int getKey();
 
         // Initialize color pairs
         void initColors();
@@ -55,6 +56,14 @@ class NcursesGraphics : public IGraphicsLibrary {
 
         // Helper method to clear input buffer
         void flushInputBuffer();
+
+        // Basic drawing methods
+        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT);
+        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT);
+        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT);
+        
+        // Player input
+        void getPlayerName(std::string& playerName);
 
         // Helper drawing methods
         void drawTextCentered(int y, const std::string& text, Color color = Color::DEFAULT);

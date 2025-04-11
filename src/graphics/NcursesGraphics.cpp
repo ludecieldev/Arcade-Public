@@ -68,29 +68,50 @@ bool NcursesGraphics::initialize()
 {
     if (_initialized) return true;
     
-    // Initialize ncurses with proper settings
-    setlocale(LC_ALL, "");  // Enable UTF-8
-    initscr();              // Initialize ncurses
-    raw();                  // Disable line buffering
-    noecho();              // Don't echo keypresses
-    curs_set(0);           // Hide cursor
-    keypad(stdscr, TRUE);  // Enable keypad input
-    nodelay(stdscr, TRUE); // Non-blocking input
-    start_color();         // Enable colors
-    use_default_colors();  // Use terminal's default colors
+    // Initialiser la bibliothèque ncurses
+    initscr();
     
-    // Initialize color pairs
-    init_pair(1, COLOR_BLACK, -1);
-    init_pair(2, COLOR_RED, -1);
-    init_pair(3, COLOR_GREEN, -1);
-    init_pair(4, COLOR_YELLOW, -1);
-    init_pair(5, COLOR_BLUE, -1);
-    init_pair(6, COLOR_MAGENTA, -1);
-    init_pair(7, COLOR_CYAN, -1);
-    init_pair(8, COLOR_WHITE, -1);
+    // Vider les buffers d'entrée
+    flushinp();
     
-    // Get terminal size
+    // Configurer ncurses pour l'utilisation des couleurs
+    start_color();
+    use_default_colors();
+    
+    // Configurer pour que getch() ne bloque pas
+    nodelay(stdscr, TRUE);
+    
+    // Désactiver l'écho des touches pour éviter les doublons
+    noecho();
+    
+    // Activer la lecture des touches spéciales (flèches, etc.)
+    keypad(stdscr, TRUE);
+    
+    // Masquer le curseur par défaut
+    curs_set(0);
+    
+    // Désactiver le buffering d'entrée (cause souvent des doublons)
+    cbreak();
+    
+    // Désactiver le flush automatique (stdout et stderr)
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+    
+    // Récupérer la taille du terminal
     updateTerminalSize();
+    
+    // Initialiser les paires de couleurs
+    init_pair(1, COLOR_BLACK, -1);    // NOIR sur fond par défaut
+    init_pair(2, COLOR_RED, -1);      // ROUGE sur fond par défaut
+    init_pair(3, COLOR_GREEN, -1);    // VERT sur fond par défaut
+    init_pair(4, COLOR_YELLOW, -1);   // JAUNE sur fond par défaut
+    init_pair(5, COLOR_BLUE, -1);     // BLEU sur fond par défaut
+    init_pair(6, COLOR_MAGENTA, -1);  // MAGENTA sur fond par défaut
+    init_pair(7, COLOR_CYAN, -1);     // CYAN sur fond par défaut
+    init_pair(8, COLOR_WHITE, -1);    // BLANC sur fond par défaut
+    
+    // Afficher l'écran de démarrage
+    showSplashScreen();
     
     _initialized = true;
     return true;
@@ -234,94 +255,112 @@ void NcursesGraphics::drawList(int x, int y, const std::vector<std::string>& ite
 
 void NcursesGraphics::getPlayerName(std::string& playerName)
 {
-    if (!_initialized) return;
+    if (!_initialized)
+        return;
+
+    // Vider le buffer d'entrée pour éviter les doublons initiaux
+    flushinp();
     
-    clear();
-    
-    // Draw title box
-    int boxWidth = 40;
-    int boxHeight = 3;
-    int startX = (_width - boxWidth) / 2;
-    int startY = (_height - boxHeight) / 2 - 2;
-    
-    // Draw header
-    drawBoldText(startX + (boxWidth - 16) / 2, startY - 2, "Enter Your Name:", Color::CYAN);
-    
-    // Draw input box
-    drawBox(startX, startY, boxWidth, boxHeight, Color::WHITE);
-    
-    // Enable input mode
-    curs_set(1);  // Show cursor
-    echo();       // Show typed characters
-    
-    // Move cursor to input position
-    int inputX = startX + 2;
-    int inputY = startY + 1;
-    move(inputY, inputX);
-    refresh();
-    
-    // Get input
-    char input[256];
-    memset(input, 0, sizeof(input));
-    
-    // Configure input field
-    WINDOW* inputWin = newwin(1, boxWidth - 4, inputY, inputX);
-    keypad(inputWin, TRUE);
-    
-    // Read input
-    int ch;
-    int pos = 0;
-    while ((ch = wgetch(inputWin)) != '\n' && ch != KEY_ENTER && ch != KEY_ESC_CODE) {
-        if (ch == KEY_BACKSPACE || ch == 127) {
-            if (pos > 0) {
-                pos--;
-                input[pos] = '\0';
-                mvwaddch(inputWin, 0, pos, ' ');
-                wmove(inputWin, 0, pos);
-                wrefresh(inputWin);
-            }
-        } else if (pos < static_cast<int>(sizeof(input) - 1) && isprint(ch)) {
-            input[pos] = ch;
-            pos++;
-            input[pos] = '\0';
-        }
-        wrefresh(inputWin);
-    }
-    
-    // Restore terminal settings
+    // Désactiver complètement l'écho des caractères
     noecho();
-    curs_set(0);
     
-    // Update player name if input is not empty
-    if (pos > 0) {
-        playerName = input;
+    // Créer une fenêtre d'entrée avec un fond coloré pour la visibilité
+    WINDOW* inputWin = newwin(5, 50, (_height - 5) / 2, (_width - 50) / 2);
+    box(inputWin, 0, 0);
+    wbkgd(inputWin, COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
+    mvwprintw(inputWin, 1, 2, "Enter your name:");
+    mvwprintw(inputWin, 3, 2, "Press Enter when done, Esc to cancel");
+    
+    // Zone d'entrée
+    WINDOW* textWin = derwin(inputWin, 1, 40, 2, 5);
+    wbkgd(textWin, COLOR_PAIR(getColorPair(COLOR_BLACK, COLOR_WHITE)));
+    keypad(textWin, TRUE);
+    
+    // Affichage initial
+    wrefresh(inputWin);
+    wrefresh(textWin);
+    
+    // Variables pour suivre l'entrée
+    playerName.clear();
+    bool done = false;
+    int cursor_x = 0;
+    
+    // Activer le curseur
+    curs_set(1);
+    
+    // Boucle d'entrée
+    while (!done) {
+        // Positionner le curseur
+        wmove(textWin, 0, cursor_x);
+        wrefresh(textWin);
+        
+        // Obtenir l'entrée
+        int ch = wgetch(textWin);
+        
+        // Traiter l'entrée
+        switch (ch) {
+            case 10:  // Enter
+            case KEY_ENTER:
+                done = true;
+                break;
+                
+            case 27:  // Escape
+                playerName.clear();
+                done = true;
+                break;
+                
+            case KEY_BACKSPACE:
+            case 127:  // Backspace
+                if (!playerName.empty()) {
+                    playerName.pop_back();
+                    cursor_x--;
+                    
+                    // Effacer le caractère
+                    mvwaddch(textWin, 0, cursor_x, ' ');
+                    wmove(textWin, 0, cursor_x);
+                    wrefresh(textWin);
+                }
+                break;
+                
+            default:
+                // N'accepter que les caractères imprimables
+                if (isprint(ch) && playerName.length() < 20) {
+                    playerName += ch;
+                    mvwaddch(textWin, 0, cursor_x, ch);
+                    cursor_x++;
+                    wrefresh(textWin);
+                }
+                break;
+        }
     }
     
-    // Clean up
+    // Masquer le curseur et nettoyer
+    curs_set(0);
+    delwin(textWin);
     delwin(inputWin);
+    
+    // Nettoyer complètement le buffer d'entrée
+    flushinp();
+    
+    // Retour à l'écran principal
     clear();
     refresh();
 }
 
 int NcursesGraphics::getKey()
 {
-    if (!_initialized) return 0;
+    if (!_initialized)
+        return 0;
     
     int ch = getch();
-    if (ch == ERR) return 0;
     
-    switch (ch) {
-        case KEY_UP: return KEY_UP_CODE;
-        case KEY_DOWN: return KEY_DOWN_CODE;
-        case KEY_LEFT: return KEY_LEFT_CODE;
-        case KEY_RIGHT: return KEY_RIGHT_CODE;
-        case 27: return KEY_ESC_CODE;
-        case KEY_BACKSPACE: return KEY_BACKSPACE_CODE;
-        case 10: return KEY_ENTER_CODE;
-        case '9': return KEY_NEXT_LIB_CODE;
-        case '7': return KEY_NEXT_GAME_CODE;
-        default: return ch;
-    }
+    if (ch == ERR)
+        return 0;
+    
+    // Vider le tampon d'entrée pour éviter les échos de touches
+    flushinp();
+    
+    return mapKeyCode(ch);
 }
 
 void NcursesGraphics::flushInputBuffer()
@@ -458,15 +497,26 @@ void NcursesGraphics::drawBoldText(int x, int y, const std::string& text, Color 
 int NcursesGraphics::mapKeyCode(int ncursesKey)
 {
     switch (ncursesKey) {
-        case KEY_UP: return KeyCode::UP;
-        case KEY_DOWN: return KeyCode::DOWN;
-        case KEY_LEFT: return KeyCode::LEFT;
-        case KEY_RIGHT: return KeyCode::RIGHT;
-        case 27: return KeyCode::ESC;
-        case KEY_BACKSPACE: return KeyCode::BACKSPACE;
-        case 10: return KeyCode::ENTER;
-        case ' ': return KeyCode::SPACE;
-        default: return ncursesKey;
+        case KEY_UP:            return KeyCode::UP;
+        case KEY_DOWN:          return KeyCode::DOWN;
+        case KEY_LEFT:          return KeyCode::LEFT;
+        case KEY_RIGHT:         return KeyCode::RIGHT;
+        case 27:                return KeyCode::ESC;
+        case KEY_BACKSPACE:     return KeyCode::BACKSPACE;
+        case 10:                return KeyCode::ENTER; // Return key
+        case KEY_ENTER:         return KeyCode::ENTER; // Keypad Enter
+        case ' ':               return KeyCode::SPACE;
+        case '7':               return KeyCode::NEXT_GAME;
+        case '8':               return KeyCode::PREV_GAME;
+        case '9':               return KeyCode::NEXT_LIB;
+        case '0':               return KeyCode::PREV_LIB;
+        case 'r':
+        case 'R':               return KeyCode::RESTART;
+        case 'p':
+        case 'P':               return KeyCode::PAUSE;
+        case 'q':
+        case 'Q':               return KeyCode::QUIT;
+        default:                return ncursesKey;
     }
 }
 
@@ -474,13 +524,29 @@ int NcursesGraphics::mapKeyCode(int ncursesKey)
 
 std::optional<std::unique_ptr<IEvent>> NcursesGraphics::pollEvent()
 {
-    if (!_initialized) return std::nullopt;
+    if (!_initialized) {
+        return std::nullopt;
+    }
+
+    // Configurer le timeout pour nodelay
+    timeout(0);
     
+    // Récupérer une touche, ne bloque pas grâce au timeout(0)
     int ch = getch();
-    if (ch == ERR) return std::nullopt;
     
-    int keyCode = mapKeyCode(ch);
-    return IEvent::createKeyEvent(keyCode, true);
+    // Si pas de touche, retourner nullopt
+    if (ch == ERR) {
+        return std::nullopt;
+    }
+    
+    // Vider le tampon d'entrée pour éviter les doublons
+    flushinp();
+    
+    // Si c'est une touche spéciale, la mapper sur notre système de codes
+    int mappedKey = mapKeyCode(ch);
+    
+    // Créer et retourner un événement clavier
+    return std::make_optional(IEvent::createKeyEvent(mappedKey, true));
 }
 
 void NcursesGraphics::renderEntity(const Entity& entity)
@@ -517,39 +583,44 @@ void NcursesGraphics::renderGameState(const IGameState& gameState)
 {
     if (!_initialized) return;
     
-    // Clear the screen for fresh rendering
-    clear();
+    clear();  // Effacer l'écran avant de dessiner
     
-    // Center the game board on screen
-    int offsetX = (_width - gameState.getWidth()) / 2;
-    int offsetY = (_height - gameState.getHeight()) / 2;
+    // Récupérer toutes les entités du jeu
+    const auto& entities = gameState.getEntities();
     
-    // Draw border around the game board
-    drawBox(offsetX - 1, offsetY - 1, gameState.getWidth() + 2, gameState.getHeight() + 2, Color::CYAN);
+    // Afficher chaque entité
+    for (const auto& entity : entities) {
+        // Obtenir la couleur de l'entité
+        Color color = Color::WHITE;  // Couleur par défaut
+        
+        if (entity.colorName == "RED") color = Color::RED;
+        else if (entity.colorName == "GREEN") color = Color::GREEN;
+        else if (entity.colorName == "BLUE") color = Color::BLUE;
+        else if (entity.colorName == "YELLOW") color = Color::YELLOW;
+        else if (entity.colorName == "MAGENTA") color = Color::MAGENTA;
+        else if (entity.colorName == "CYAN") color = Color::CYAN;
+        else if (entity.colorName == "WHITE") color = Color::WHITE;
+        
+        // Utiliser le symbole de l'entité ou un caractère par défaut
+        std::string symbol = entity.symbol.empty() ? "█" : entity.symbol;
+        
+        // Dessiner l'entité à sa position
+        attron(COLOR_PAIR(static_cast<int>(color)));
+        mvaddstr(entity.y, entity.x, symbol.c_str());
+        attroff(COLOR_PAIR(static_cast<int>(color)));
+    }
     
-    // Draw game information (score, message)
-    std::string scoreText = "Score: " + std::to_string(gameState.getScore());
-    drawText(offsetX, offsetY - 2, scoreText, Color::YELLOW);
-    
+    // Si le jeu est terminé, afficher un message
     if (gameState.isGameOver()) {
-        std::string gameOverText = "Game Over!";
-        drawBoldText((_width - gameOverText.length()) / 2, offsetY + gameState.getHeight() + 2, gameOverText, Color::RED);
+        std::string message = "GAME OVER - Press 'R' to restart";
+        drawTextCentered(_height / 2, message, Color::RED);
     }
     
-    if (!gameState.getMessage().empty()) {
-        drawTextCentered(offsetY + gameState.getHeight() + 3, gameState.getMessage(), Color::WHITE);
-    }
+    // Afficher le score dans un coin
+    std::string scoreText = "Score: " + std::to_string(gameState.getScore());
+    drawText(2, 1, scoreText, Color::YELLOW);
     
-    // Render all entities
-    for (const auto& entity : gameState.getEntities()) {
-        // Adjust entity position with offset
-        Entity adjustedEntity = entity;
-        adjustedEntity.x += offsetX;
-        adjustedEntity.y += offsetY;
-        renderEntity(adjustedEntity);
-    }
-    
-    // Refresh screen
+    // Rafraîchir l'écran
     refresh();
 }
 

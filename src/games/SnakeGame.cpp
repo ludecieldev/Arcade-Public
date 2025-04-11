@@ -4,6 +4,7 @@
 #include <random>
 #include <chrono>
 #include <algorithm>
+#include <iostream>
 
 namespace arcd {
 
@@ -111,20 +112,24 @@ bool SnakeGame::processEvent(const IEvent& event)
     
     switch (event.getKeyCode()) {
         case KeyCode::UP:
-            if (_direction != Direction::DOWN)
+            if (_direction != Direction::DOWN) {
                 _nextDirection = Direction::UP;
+            }
             return true;
         case KeyCode::DOWN:
-            if (_direction != Direction::UP)
+            if (_direction != Direction::UP) {
                 _nextDirection = Direction::DOWN;
+            }
             return true;
         case KeyCode::LEFT:
-            if (_direction != Direction::RIGHT)
+            if (_direction != Direction::RIGHT) {
                 _nextDirection = Direction::LEFT;
+            }
             return true;
         case KeyCode::RIGHT:
-            if (_direction != Direction::LEFT)
+            if (_direction != Direction::LEFT) {
                 _nextDirection = Direction::RIGHT;
+            }
             return true;
         default:
             return false;

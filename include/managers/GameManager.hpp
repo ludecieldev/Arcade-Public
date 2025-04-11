@@ -41,8 +41,8 @@ namespace arcd {
             // Game loop
             void update(double deltaTime);
             
-            // Input handling - returns true if the event was handled
-            bool processEvent(const IEvent& event);
+            // Event handling
+            void processEvent(const IEvent& event);
             
             // Game state
             std::unique_ptr<IGameState> getGameState() const;

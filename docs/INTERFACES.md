@@ -8,59 +8,44 @@ Interfaces in the Arcade project serve as the foundation for its modular archite
 
 1. **IGraphicsLibrary**: Interface for graphics rendering libraries
 2. **IGameLibrary**: Interface for game logic libraries
+3. **IGameState**: Interface for representing game state
+4. **IEvent**: Interface for input events
 
-These interfaces enable the Core engine to interact with various implementations of games and graphics libraries in a consistent manner.
+These interfaces enable the Core engine to interact with various implementations of games and graphics libraries in a consistent manner and maintain a clean separation of concerns.
 
 ## IGraphicsLibrary Interface
 
-The `IGraphicsLibrary` interface is defined in `include/interfaces/IGraphicsLibrary.hpp` and provides methods for rendering and input handling.
+The `IGraphicsLibrary` interface provides methods for rendering and input handling.
 
 ### Key Components
 
 ```cpp
 class IGraphicsLibrary {
 public:
-    // Common key codes for consistent input handling across graphics libraries
-    static const int KEY_UP_CODE = -1;
-    static const int KEY_DOWN_CODE = -2;
-    static const int KEY_LEFT_CODE = -3;
-    static const int KEY_RIGHT_CODE = -4;
-    static const int KEY_ENTER_CODE = -5;
-    static const int KEY_ESC_CODE = -6;
-    static const int KEY_BACKSPACE_CODE = -7;
-    static const int KEY_NEXT_LIB_CODE = -8;
-    static const int KEY_NEXT_GAME_CODE = -9;
-    
-    // Colors for rendering
-    enum class Color {
-        DEFAULT, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
-    };
-    
     virtual ~IGraphicsLibrary() = default;
     
-    // Initialization and cleanup
+    // Lifecycle management
     virtual bool initialize() = 0;
     virtual void cleanup() = 0;
     
-    // Display functions
+    // Display management
     virtual void clear() = 0;
     virtual void refresh() = 0;
     
-    // Drawing functions
-    virtual void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) = 0;
-    virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
-    virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
+    // Game state rendering
+    virtual void renderGameState(const IGameState& state) = 0;
+    
+    // UI rendering
+    virtual void renderUI(const std::vector<UIElement>& elements) = 0;
     
     // Input handling
-    virtual int getKey() = 0;
+    virtual std::optional<std::unique_ptr<IEvent>> pollEvent() = 0;
     
-    // Player name input
+    // Player interaction
     virtual void getPlayerName(std::string& playerName) = 0;
     
-    // Library information
+    // Window information
     virtual std::string getName() const = 0;
-    
-    // Window dimensions
     virtual int getWidth() const = 0;
     virtual int getHeight() const = 0;
 };
@@ -78,15 +63,14 @@ public:
 - `void clear()`: Clears the screen/display buffer.
 - `void refresh()`: Updates the display with any changes since the last refresh.
 
-#### Drawing Functions
+#### Rendering
 
-- `void drawText(int x, int y, const std::string& text, Color color)`: Draws text at position (x,y) with the specified color.
-- `void drawBox(int x, int y, int width, int height, Color color)`: Draws a rectangular box with the top-left corner at (x,y) and the specified dimensions.
-- `void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color)`: Draws a list of items with the selected item highlighted.
+- `void renderGameState(const IGameState& state)`: Renders the current game state.
+- `void renderUI(const std::vector<UIElement>& elements)`: Renders UI elements like menus.
 
 #### Input Handling
 
-- `int getKey()`: Returns the key code of the last key pressed, or 0 if no key has been pressed.
+- `std::optional<std::unique_ptr<IEvent>> pollEvent()`: Returns the next available event, or std::nullopt if no event is available.
 - `void getPlayerName(std::string& playerName)`: Implements player name input handling, updating the provided string.
 
 #### Information Functions
@@ -95,40 +79,9 @@ public:
 - `int getWidth() const`: Returns the width of the display area.
 - `int getHeight() const`: Returns the height of the display area.
 
-### Key Codes
-
-The `IGraphicsLibrary` interface defines standard key codes for consistent input handling across different graphics libraries:
-
-| Constant | Value | Description |
-|----------|-------|-------------|
-| KEY_UP_CODE | -1 | Up arrow key |
-| KEY_DOWN_CODE | -2 | Down arrow key |
-| KEY_LEFT_CODE | -3 | Left arrow key |
-| KEY_RIGHT_CODE | -4 | Right arrow key |
-| KEY_ENTER_CODE | -5 | Enter/Return key |
-| KEY_ESC_CODE | -6 | Escape key |
-| KEY_BACKSPACE_CODE | -7 | Backspace key |
-| KEY_NEXT_LIB_CODE | -8 | Key to switch to next graphics library |
-| KEY_NEXT_GAME_CODE | -9 | Key to switch to next game |
-
-### Colors
-
-The `Color` enum defines standard colors for rendering:
-
-| Color | Description |
-|-------|-------------|
-| DEFAULT | Default color (typically white) |
-| RED | Red color |
-| GREEN | Green color |
-| YELLOW | Yellow color |
-| BLUE | Blue color |
-| MAGENTA | Magenta color |
-| CYAN | Cyan color |
-| WHITE | White color |
-
 ## IGameLibrary Interface
 
-The `IGameLibrary` interface is defined in `include/interfaces/IGameLibrary.hpp` and provides methods for game logic and rendering.
+The `IGameLibrary` interface provides methods for game logic and state management.
 
 ### Key Components
 
@@ -136,57 +89,184 @@ The `IGameLibrary` interface is defined in `include/interfaces/IGameLibrary.hpp`
 class IGameLibrary {
 public:
     virtual ~IGameLibrary() = default;
-    
-    // Initialization and cleanup
-    virtual bool initialize() = 0;
+
+    // Game lifecycle
+    virtual void initialize() = 0;
+    virtual void update(double deltaTime) = 0;
+    virtual void restart() = 0;
     virtual void cleanup() = 0;
-    
-    // Game loop methods
-    virtual void update(Core* core) = 0;
-    virtual void render(IGraphicsLibrary* graphicsLib) = 0;
-    
+
     // Input handling
-    virtual void handleInput(int key) = 0;
-    
+    virtual bool processEvent(const IEvent& event) = 0;
+
+    // Game state
+    virtual std::unique_ptr<IGameState> getGameState() const = 0;
+
     // Game information
     virtual std::string getName() const = 0;
     virtual std::string getDescription() const = 0;
     
-    // Score management
-    virtual int getScore() const = 0;
-    virtual void resetGame() = 0;
-    
-    // Game state
+    // Additional methods for game state query
     virtual bool isGameOver() const = 0;
+    virtual int getScore() const = 0;
 };
 ```
 
 ### Method Descriptions
 
-#### Initialization and Cleanup
+#### Game Lifecycle
 
-- `bool initialize()`: Sets up the game, initializing game state, resources, etc. Returns true if successful.
+- `void initialize()`: Sets up the game, initializing game state, resources, etc.
+- `void update(double deltaTime)`: Updates the game state based on elapsed time.
+- `void restart()`: Resets the game to its initial state.
 - `void cleanup()`: Cleans up resources used by the game.
-
-#### Game Loop
-
-- `void update(Core* core)`: Updates the game state based on elapsed time and input. The Core parameter allows the game to interact with the application.
-- `void render(IGraphicsLibrary* graphicsLib)`: Renders the current game state using the provided graphics library.
 
 #### Input Handling
 
-- `void handleInput(int key)`: Processes a key input from the user.
+- `bool processEvent(const IEvent& event)`: Processes an input event from the user. Returns true if the event was handled.
+
+#### Game State
+
+- `std::unique_ptr<IGameState> getGameState() const`: Returns the current state of the game.
 
 #### Information Functions
 
 - `std::string getName() const`: Returns the name of the game.
 - `std::string getDescription() const`: Returns a description of the game.
+- `bool isGameOver() const`: Returns true if the game is over.
+- `int getScore() const`: Returns the current score.
 
-#### Game State Management
+## IGameState Interface
+
+The `IGameState` interface represents the current state of a game in a way that can be rendered by any graphics library.
+
+### Key Components
+
+```cpp
+class IGameState {
+public:
+    virtual ~IGameState() = default;
+    
+    // Game state access
+    virtual int getScore() const = 0;
+    virtual bool isGameOver() const = 0;
+    virtual std::string getMessage() const = 0;
+    
+    // Board dimensions
+    virtual int getWidth() const = 0;
+    virtual int getHeight() const = 0;
+    
+    // Entities in the game
+    virtual const std::vector<Entity>& getEntities() const = 0;
+};
+```
+
+### Method Descriptions
 
 - `int getScore() const`: Returns the current score.
-- `void resetGame()`: Resets the game to its initial state.
 - `bool isGameOver() const`: Returns true if the game is over.
+- `std::string getMessage() const`: Returns any message to display (e.g., game over message).
+- `int getWidth() const`: Returns the width of the game board.
+- `int getHeight() const`: Returns the height of the game board.
+- `const std::vector<Entity>& getEntities() const`: Returns all entities to be rendered.
+
+## IEvent Interface
+
+The `IEvent` interface represents input events in a way that's independent of the graphics library.
+
+### Key Components
+
+```cpp
+enum class EventType {
+    KEY_PRESSED,
+    TEXT_ENTERED,
+    MOUSE_PRESSED,
+    MOUSE_RELEASED,
+    MOUSE_MOVED,
+    WINDOW_CLOSED
+};
+
+enum class KeyCode {
+    UNKNOWN,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
+    ENTER,
+    ESC,
+    BACKSPACE,
+    NEXT_LIB,
+    NEXT_GAME,
+    QUIT,
+    RESTART
+};
+
+enum class MouseButton {
+    NONE,
+    LEFT,
+    RIGHT,
+    MIDDLE
+};
+
+class IEvent {
+public:
+    virtual ~IEvent() = default;
+    
+    virtual EventType getType() const = 0;
+    virtual KeyCode getKeyCode() const = 0;
+    virtual char getCharacter() const = 0;
+    
+    // Mouse event information
+    virtual int getMouseX() const = 0;
+    virtual int getMouseY() const = 0;
+    virtual MouseButton getMouseButton() const = 0;
+};
+```
+
+### Method Descriptions
+
+- `EventType getType() const`: Returns the type of event.
+- `KeyCode getKeyCode() const`: Returns the key code for key events.
+- `char getCharacter() const`: Returns the character for text input events.
+- `int getMouseX() const`: Returns the X coordinate for mouse events.
+- `int getMouseY() const`: Returns the Y coordinate for mouse events.
+- `MouseButton getMouseButton() const`: Returns the button for mouse button events.
+
+## UI Elements
+
+UI Elements are used to represent menu items, text, and other UI components.
+
+```cpp
+enum class UIElementType {
+    TEXT,
+    RECT,
+    LIST
+};
+
+enum class Color {
+    DEFAULT,
+    BLACK,
+    RED,
+    GREEN,
+    YELLOW,
+    BLUE,
+    MAGENTA,
+    CYAN,
+    WHITE
+};
+
+struct UIElement {
+    UIElementType type;
+    int x;
+    int y;
+    int width;
+    int height;
+    std::string text;
+    Color color;
+    bool selected;
+    std::map<std::string, std::string> properties;
+};
+```
 
 ## Implementing the Interfaces
 
@@ -200,12 +280,12 @@ To create a new graphics library for the Arcade project:
 
 ```cpp
 extern "C" {
-    arcd::IGraphicsLibrary* createGraphicsLibrary() {
-        return new YourGraphicsLibrary();
+    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary() {
+        return std::make_unique<YourGraphicsLibrary>();
     }
 
-    void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib) {
-        delete graphicsLib;
+    void destroyGraphicsLibrary([[maybe_unused]] arcd::IGraphicsLibrary* graphicsLib) {
+        // With smart pointers, this is not needed anymore
     }
 }
 ```
@@ -220,30 +300,14 @@ To create a new game for the Arcade project:
 
 ```cpp
 extern "C" {
-    arcd::IGameLibrary* createGameLibrary() {
-        return new YourGame();
+    std::unique_ptr<arcd::IGameLibrary> createGameLibrary() {
+        return std::make_unique<YourGame>();
     }
 
-    void destroyGameLibrary(arcd::IGameLibrary* gameLib) {
-        delete gameLib;
+    void destroyGameLibrary([[maybe_unused]] arcd::IGameLibrary* gameLib) {
+        // With smart pointers, this is not needed anymore
     }
 }
-```
-
-## Additional Interfaces
-
-### IDisplayable Interface (Optional)
-
-Some implementations may use an additional `IDisplayable` interface for elements that can be rendered:
-
-```cpp
-class IDisplayable {
-public:
-    virtual ~IDisplayable() = default;
-    
-    virtual void render(IGraphicsLibrary* graphicsLib) = 0;
-    virtual void update(float deltaTime) = 0;
-};
 ```
 
 ## Interface Design Principles

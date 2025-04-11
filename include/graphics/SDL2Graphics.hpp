@@ -9,7 +9,9 @@
 #define SDL2_GRAPHICS_HPP
 
 #include "../interfaces/IGraphicsLibrary.hpp"
-#include "../Core.hpp"
+#include "../interfaces/ICore.hpp"
+#include "../utils/Event.hpp"
+#include "../utils/KeyCodes.hpp"
 #include <string>
 #include <vector>
 #include <map>
@@ -32,7 +34,7 @@ class SDL2Graphics : public IGraphicsLibrary {
         SDL_Renderer* _renderer;
         TTF_Font* _font;
         std::map<int, SDL_Color> _colors;
-        std::optional<std::reference_wrapper<Core>> _core;
+        std::optional<std::reference_wrapper<ICore>> _core;
 
         // Helper methods
         void updateWindowSize();
@@ -51,6 +53,17 @@ class SDL2Graphics : public IGraphicsLibrary {
         void drawVerticalLine(int x, int y, int height, Color color = Color::DEFAULT);
         void drawProgressBar(int x, int y, int width, int value, int maxValue, Color color = Color::DEFAULT);
         void drawBoldText(int x, int y, const std::string& text, Color color);
+        
+        // Map SDL key code to our standard key codes
+        int mapKeyCode(SDL_Keycode sdlKey);
+        
+        // Text and Box drawing methods
+        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT);
+        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT);
+        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT);
+        
+        // Drawing methods for game entities
+        void renderEntity(const Entity& entity);
 
     public:
         SDL2Graphics();
@@ -63,27 +76,29 @@ class SDL2Graphics : public IGraphicsLibrary {
         // Display functions
         void clear() override;
         void refresh() override;
+        
+        // Input polling - returns none if no event is available
+        std::optional<std::unique_ptr<IEvent>> pollEvent() override;
+        
+        // Game rendering - renders the game state
+        void renderGameState(const IGameState& gameState) override;
+        
+        // UI rendering - for menus, etc.
+        void renderUI(const std::vector<UIElement>& uiElements) override;
 
-        // Drawing functions with color support
-        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) override;
-        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) override;
-        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) override;
-
-        // Input handling
-        int getKey() override;
-
-        // Player name input
+        // Player interaction - pour la saisie du nom du joueur
         void getPlayerName(std::string& playerName) override;
 
-        // Library information
-        std::string getName() const override;
-
-        // Window dimensions
+        // Window information
         int getWidth() const override { return _width; }
         int getHeight() const override { return _height; }
 
+        // Library information
+        std::string getName() const override;
+        std::string getDescription() const override { return "SDL2 graphics library"; }
+
         // Set core reference
-        void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }
+        void setCore(ICore& core) { _core = std::reference_wrapper<ICore>(core); }
 };
 
 }

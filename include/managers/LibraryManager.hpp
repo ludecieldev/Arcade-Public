@@ -67,8 +67,38 @@ namespace arcd {
             // Library access
             IGraphicsLibrary& getCurrentGraphicsLibrary();
             IGameLibrary& getCurrentGameLibrary();
-            std::string getCurrentGraphicsLibraryName() const { return _currentGraphicsLibPath; }
-            std::string getCurrentGameLibraryName() const { return _currentGameLibPath; }
+            std::string getCurrentGraphicsLibraryName() const {
+                if (!_currentGraphicsLib) {
+                    return "None";
+                }
+                
+                std::string fullPath = _currentGraphicsLibPath;
+                size_t arcade_ = fullPath.find("arcade_");
+                size_t dotSo = fullPath.find(".so");
+                
+                if (arcade_ != std::string::npos && dotSo != std::string::npos) {
+                    // Extraire le nom entre "arcade_" et ".so"
+                    return fullPath.substr(arcade_ + 7, dotSo - arcade_ - 7);
+                }
+                
+                return _currentGraphicsLib->getName();
+            }
+            std::string getCurrentGameLibraryName() const {
+                if (!_currentGameLib) {
+                    return "None";
+                }
+                
+                std::string fullPath = _currentGameLibPath;
+                size_t arcade_ = fullPath.find("arcade_");
+                size_t dotSo = fullPath.find(".so");
+                
+                if (arcade_ != std::string::npos && dotSo != std::string::npos) {
+                    // Extraire le nom entre "arcade_" et ".so"
+                    return fullPath.substr(arcade_ + 7, dotSo - arcade_ - 7);
+                }
+                
+                return _currentGameLib->getName();
+            }
             
             // Check if libraries are loaded
             bool hasGraphicsLibrary() const;

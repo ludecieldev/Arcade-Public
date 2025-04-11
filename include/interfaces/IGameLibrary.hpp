@@ -34,6 +34,10 @@ public:
     // Game information
     virtual std::string getName() const = 0;
     virtual std::string getDescription() const = 0;
+
+    // Game status - for direct query without creating a game state
+    virtual bool isGameOver() const = 0;
+    virtual int getScore() const = 0;
 };
 
 } // namespace arcd

@@ -24,6 +24,8 @@ enum class CoreState {
     GAME,
     GAME_OVER,
     PAUSE,
+    SELECT_GAME,
+    SELECT_GRAPHICS,
     EXIT
 };
 
@@ -51,8 +53,8 @@ public:
     virtual CoreState getState() const = 0;
     virtual void setState(CoreState state) = 0;
     
-    // Event handling - the central hub for event processing
-    virtual void processEvent(const IEvent& event) = 0;
+    // Event handling - can be used to route events from a game or graphics library
+    virtual void processEvents() = 0;
     
     // Game state handling - the central hub for game state
     virtual const IGameState* getCurrentGameState() const = 0;

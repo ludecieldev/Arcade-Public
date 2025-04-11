@@ -12,6 +12,14 @@ Graphics libraries in the Arcade project are responsible for:
 
 Each graphics library implements the same interface (`IGraphicsLibrary`), allowing games to be rendered consistently regardless of which graphics library is active.
 
+## Separation of Concerns
+
+It's important to note that graphics libraries:
+- Should NOT contain any game logic
+- Should NOT make gameplay decisions
+- Should ONLY render what's provided by the Core
+- Should ONLY capture inputs and pass them to the Core without interpretation
+
 ## Available Graphics Libraries
 
 The Arcade project includes several graphics libraries:
@@ -24,312 +32,232 @@ The Arcade project includes several graphics libraries:
 
 ## Graphics Library Interface
 
-All graphics libraries implement the `IGraphicsLibrary` interface defined in `include/interfaces/IGraphicsLibrary.hpp`:
+All graphics libraries implement the `IGraphicsLibrary` interface:
 
 ```cpp
 class IGraphicsLibrary {
 public:
-    // Common key codes
-    static const int KEY_UP_CODE = -1;
-    static const int KEY_DOWN_CODE = -2;
-    static const int KEY_LEFT_CODE = -3;
-    static const int KEY_RIGHT_CODE = -4;
-    static const int KEY_ENTER_CODE = -5;
-    static const int KEY_ESC_CODE = -6;
-    static const int KEY_BACKSPACE_CODE = -7;
-    static const int KEY_NEXT_LIB_CODE = -8;
-    static const int KEY_NEXT_GAME_CODE = -9;
-    
-    // Colors for rendering
-    enum class Color {
-        DEFAULT, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
-    };
-    
     virtual ~IGraphicsLibrary() = default;
     
-    // Initialization and cleanup
+    // Lifecycle management
     virtual bool initialize() = 0;
     virtual void cleanup() = 0;
     
-    // Display functions
+    // Display management
     virtual void clear() = 0;
     virtual void refresh() = 0;
     
-    // Drawing functions
-    virtual void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) = 0;
-    virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
-    virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
+    // Game state rendering
+    virtual void renderGameState(const IGameState& state) = 0;
+    
+    // UI rendering
+    virtual void renderUI(const std::vector<UIElement>& elements) = 0;
     
     // Input handling
-    virtual int getKey() = 0;
+    virtual std::optional<std::unique_ptr<IEvent>> pollEvent() = 0;
     
-    // Player name input
+    // Player interaction
     virtual void getPlayerName(std::string& playerName) = 0;
     
-    // Library information
+    // Window information
     virtual std::string getName() const = 0;
-    
-    // Window dimensions
     virtual int getWidth() const = 0;
     virtual int getHeight() const = 0;
 };
 ```
 
-## SFML Graphics Library Implementation
+## Event Interface
 
-The SFML graphics library (`SFMLGraphics`) implements the graphics interface using the SFML library.
-
-### Key Classes and Components
-
-#### `SFMLGraphics` Class
-
-The main class implementing the `IGraphicsLibrary` interface for SFML.
+The `IEvent` interface is used to represent user input in a library-agnostic way:
 
 ```cpp
-class SFMLGraphics : public IGraphicsLibrary {
-private:
-    bool _initialized;
-    int _width;
-    int _height;
-    int _lastKey;
-    int _frameCounter;
-    int _selectedMenuItem;
-    sf::RenderWindow _window;
-    sf::Font _font;
-    std::map<int, sf::Color> _colors;
-    
-    // Drawing element storage
-    std::vector<TextDrawElement> _textElements;
-    std::vector<RectDrawElement> _rectElements;
-    
-    // Helper methods
-    void redrawElements();
-    void drawTestScreen();
-    int handleKeyPress(sf::Keyboard::Key key);
-    void initColors();
-    // ...
-    
+class IEvent {
 public:
-    SFMLGraphics();
-    ~SFMLGraphics() override;
+    virtual ~IEvent() = default;
     
-    // IGraphicsLibrary implementation
-    bool initialize() override;
-    void cleanup() override;
-    void clear() override;
-    void refresh() override;
-    void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) override;
-    void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) override;
-    void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) override;
-    int getKey() override;
-    void getPlayerName(std::string& playerName) override;
-    std::string getName() const override;
-    int getWidth() const override;
-    int getHeight() const override;
+    virtual EventType getType() const = 0;
+    virtual KeyCode getKeyCode() const = 0;
+    virtual char getCharacter() const = 0;
+    
+    // Mouse event information (if applicable)
+    virtual int getMouseX() const = 0;
+    virtual int getMouseY() const = 0;
+    virtual MouseButton getMouseButton() const = 0;
 };
 ```
 
-### Initialization Process
+## Game State Rendering
 
-The SFML library initialization process:
-
-1. Create an SFML window with default size (800x600)
-2. Set framerate limit to 60 FPS
-3. Load a font from several possible locations
-4. Initialize the color mapping
-5. Draw the test screen menu
-6. Mark the library as initialized
+Graphics libraries render game states provided by the Core:
 
 ```cpp
-bool SFMLGraphics::initialize() {
-    if (_initialized)
-        return true;
+void NcursesGraphics::renderGameState(const IGameState& state) 
+{
+    // Clear the game area
+    clear();
+    
+    // Draw a border around the game area
+    int width = state.getWidth();
+    int height = state.getHeight();
+    drawBorder(0, 0, width+1, height+1);
+    
+    // Render each entity in the game state
+    for (const auto& entity : state.getEntities()) {
+        int x = entity.x;
+        int y = entity.y;
+        std::string symbol = entity.symbol;
+        Color color = getColorFromName(entity.colorName);
+        
+        // Set the appropriate color
+        attron(COLOR_PAIR(static_cast<int>(color)));
+        
+        // Draw the entity symbol
+        mvprintw(y+1, x+1, "%s", symbol.c_str());
+        
+        // Reset color attributes
+        attroff(COLOR_PAIR(static_cast<int>(color)));
+    }
+    
+    // Draw the score
+    mvprintw(height+2, 1, "Score: %d", state.getScore());
+    
+    // Draw game over message if needed
+    if (state.isGameOver()) {
+        const std::string& message = state.getMessage();
+        int messageX = (width - message.length()) / 2;
+        mvprintw(height/2, messageX+1, "%s", message.c_str());
+    }
+    
+    // Refresh the display
+    refresh();
+}
+```
 
-    // Create window
-    _window.create(sf::VideoMode(sf::Vector2u(_width, _height)), "Arcade", sf::Style::Default);
-    _window.setFramerateLimit(60);
+## Input Processing
 
-    // Load font
-    std::vector<std::string> fontPaths = {
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-        "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-        "/usr/share/fonts/liberation/LiberationMono-Regular.ttf"
-    };
+Graphics libraries capture input events and convert them to a generic format:
 
-    bool fontLoaded = false;
-    for (const auto& path : fontPaths) {
-        if (std::filesystem::exists(path)) {
-            if (_font.openFromFile(path)) {
-                fontLoaded = true;
-                break;
+```cpp
+std::optional<std::unique_ptr<IEvent>> SFMLGraphics::pollEvent() 
+{
+    sf::Event sfEvent;
+    if (_window.pollEvent(sfEvent)) {
+        switch (sfEvent.type) {
+            case sf::Event::Closed:
+                return std::make_unique<Event>(EventType::WINDOW_CLOSED);
+                
+            case sf::Event::KeyPressed: {
+                KeyCode keyCode = KeyCode::UNKNOWN;
+                
+                // Map SF::Keyboard keys to our KeyCode enum
+                switch (sfEvent.key.code) {
+                    case sf::Keyboard::Up:    keyCode = KeyCode::UP; break;
+                    case sf::Keyboard::Down:  keyCode = KeyCode::DOWN; break;
+                    case sf::Keyboard::Left:  keyCode = KeyCode::LEFT; break;
+                    case sf::Keyboard::Right: keyCode = KeyCode::RIGHT; break;
+                    case sf::Keyboard::Return: keyCode = KeyCode::ENTER; break;
+                    case sf::Keyboard::Escape: keyCode = KeyCode::ESC; break;
+                    case sf::Keyboard::BackSpace: keyCode = KeyCode::BACKSPACE; break;
+                    case sf::Keyboard::F1: keyCode = KeyCode::NEXT_LIB; break;
+                    case sf::Keyboard::F2: keyCode = KeyCode::NEXT_GAME; break;
+                    case sf::Keyboard::Q: keyCode = KeyCode::QUIT; break;
+                    case sf::Keyboard::R: keyCode = KeyCode::RESTART; break;
+                    default:
+                        // For other keys, we can use their ASCII value
+                        if (sfEvent.key.code >= 0 && sfEvent.key.code < 128) {
+                            return std::make_unique<Event>(
+                                EventType::KEY_PRESSED, 
+                                KeyCode::UNKNOWN,
+                                static_cast<char>(sfEvent.key.code)
+                            );
+                        }
+                        break;
+                }
+                
+                return std::make_unique<Event>(EventType::KEY_PRESSED, keyCode);
             }
-        }
-    }
-
-    if (!fontLoaded) {
-        std::cerr << "Failed to load any font." << std::endl;
-        _window.close();
-        return false;
-    }
-
-    initColors();
-    
-    drawTestScreen();
-    
-    _initialized = true;
-    return true;
-}
-```
-
-### Rendering Flow
-
-The rendering process in SFML follows these steps:
-
-1. **Clear**: The `clear()` method clears the screen with a background color
-2. **Draw Elements**: Game calls various draw methods to add elements to the frame
-3. **Refresh**: The `refresh()` method displays the frame and processes events
-
-### Input Handling
-
-Input handling in SFML:
-
-1. **Event Polling**: `refresh()` polls for events using SFML's event system
-2. **Key Mapping**: Keys are mapped from SFML key codes to Arcade key codes
-3. **Input Processing**: `getKey()` returns the last pressed key or polls for new events
-
-```cpp
-int SFMLGraphics::handleKeyPress(sf::Keyboard::Key key) {
-    const int menuItemCount = 4;
-    
-    switch (key) {
-        case sf::Keyboard::Key::Up:
-            _selectedMenuItem = (_selectedMenuItem > 0) ? _selectedMenuItem - 1 : menuItemCount - 1;
-            return IGraphicsLibrary::KEY_UP_CODE;
-            
-        case sf::Keyboard::Key::Down:
-            _selectedMenuItem = (_selectedMenuItem < menuItemCount - 1) ? _selectedMenuItem + 1 : 0;
-            return IGraphicsLibrary::KEY_DOWN_CODE;
-            
-        case sf::Keyboard::Key::Enter:
-            return IGraphicsLibrary::KEY_ENTER_CODE;
-            
-        case sf::Keyboard::Key::Escape:
-            return IGraphicsLibrary::KEY_ESC_CODE;
-            
-        case sf::Keyboard::Key::Num9:
-            return IGraphicsLibrary::KEY_NEXT_LIB_CODE;
-            
-        case sf::Keyboard::Key::Num7:
-            return IGraphicsLibrary::KEY_NEXT_GAME_CODE;
-            
-        case sf::Keyboard::Key::Right:
-            return IGraphicsLibrary::KEY_RIGHT_CODE;
-            
-        case sf::Keyboard::Key::Left:
-            return IGraphicsLibrary::KEY_LEFT_CODE;
-            
-        default:
-            return static_cast<int>(key);
-    }
-}
-```
-
-### Menu Rendering
-
-The SFML library includes a menu system for navigation:
-
-1. The menu is drawn using `drawTestScreen()`
-2. Menu navigation uses the up/down keys to change selection
-3. Selected items are highlighted in yellow
-4. Additional information and instructions are shown at the bottom
-
-```cpp
-void SFMLGraphics::drawTestScreen() {
-    // Clear existing elements
-    _textElements.clear();
-    _rectElements.clear();
-    
-    // Clear the window
-    _window.clear(sf::Color(20, 20, 50));
-    
-    // Draw background, frame, title, etc.
-    // ...
-    
-    // Draw menu items with selection
-    std::vector<std::string> menuItems = {
-        "Play Game",
-        "Select Game",
-        "Select Graphics",
-        "Quit"
-    };
-    
-    float menuY = 160.0f;
-    for (size_t i = 0; i < menuItems.size(); i++) {
-        sf::Text menuText(_font, menuItems[i], 20);
-        menuText.setFillColor(static_cast<int>(i) == _selectedMenuItem ? sf::Color::Yellow : sf::Color::White);
-        
-        // Center the menu item
-        sf::FloatRect menuRect = menuText.getLocalBounds();
-        centerX = (_width - menuRect.size.x) / 2.0f;
-        menuText.setPosition(sf::Vector2f(centerX, menuY + i * 40.0f));
-        _window.draw(menuText);
-        
-        // Add a selection indicator for the selected item
-        if (static_cast<int>(i) == _selectedMenuItem) {
-            sf::Text selectorText(_font, "> ", 20);
-            selectorText.setFillColor(sf::Color::Yellow);
-            selectorText.setPosition(sf::Vector2f(centerX - 30.0f, menuY + i * 40.0f));
-            _window.draw(selectorText);
+                
+            case sf::Event::TextEntered:
+                if (sfEvent.text.unicode < 128) {
+                    return std::make_unique<Event>(
+                        EventType::TEXT_ENTERED,
+                        KeyCode::UNKNOWN,
+                        static_cast<char>(sfEvent.text.unicode)
+                    );
+                }
+                break;
+                
+            default:
+                break;
         }
     }
     
-    // Draw instructions and additional information
-    // ...
-    
-    // Display the frame
-    _window.display();
+    return std::nullopt; // No event available
 }
 ```
 
-## Memory Management
+## UI Rendering
 
-Graphics libraries manage resources like:
-- Window handles
-- Font resources
-- Textures and sprites
-- Drawing element collections
+Graphics libraries provide a way to render UI elements like menus and information panels:
 
-Resources are cleaned up in the `cleanup()` method and the destructor to prevent memory leaks.
+```cpp
+void SDLGraphics::renderUI(const std::vector<UIElement>& elements)
+{
+    for (const auto& element : elements) {
+        if (element.type == UIElementType::TEXT) {
+            // Set the color based on selection state
+            SDL_Color color = getSDLColor(element.selected ? Color::YELLOW : element.color);
+            
+            // Render the text
+            renderText(element.x, element.y, element.text, color);
+        }
+        else if (element.type == UIElementType::RECT) {
+            // Create a rectangle
+            SDL_Rect rect = {
+                element.x, element.y, 
+                element.width, element.height
+            };
+            
+            // Set the color
+            SDL_Color color = getSDLColor(element.color);
+            
+            // Draw the rectangle
+            SDL_SetRenderDrawColor(_renderer, color.r, color.g, color.b, color.a);
+            SDL_RenderDrawRect(_renderer, &rect);
+        }
+    }
+}
+```
 
-## External Entry Points
+## Creating a New Graphics Library
 
-Each graphics library provides C-style functions for dynamic loading:
+To create a new graphics library:
+
+1. Create a class that inherits from `IGraphicsLibrary`
+2. Implement all required methods
+3. Provide a way to manage a window, handle input, and render content
+4. Export the required creation and destruction functions:
 
 ```cpp
 extern "C" {
-    arcd::IGraphicsLibrary* createGraphicsLibrary() {
-        return new arcd::SFMLGraphics();
+    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary() {
+        return std::make_unique<MyGraphicsLib>();
     }
-
-    void destroyGraphicsLibrary(arcd::IGraphicsLibrary* graphicsLib) {
-        delete graphicsLib;
+    
+    void destroyGraphicsLibrary([[maybe_unused]] arcd::IGraphicsLibrary* graphicsLib) {
+        // With smart pointers, this is not needed anymore
     }
 }
 ```
 
-## Performance Considerations
+## Best Practices
 
-For optimal performance, graphics libraries:
-- Minimize redrawing when not needed
-- Cache resources where possible
-- Leverage hardware acceleration when available
-- Maintain consistent frame rates
+When implementing a graphics library:
 
-## Next Steps
-
-For more information on related components:
-- [Core Engine Documentation](CORE.md)
-- [Game Libraries Documentation](GAME_LIBS.md)
-- [Interfaces Documentation](INTERFACES.md) 
+1. **Performance**: Use efficient rendering techniques
+2. **Resource Management**: Clean up resources properly in the cleanup method
+3. **Error Handling**: Gracefully handle initialization failures and runtime errors
+4. **Input Mapping**: Provide consistent key mappings across libraries
+5. **Separation of Concerns**: Never include game logic in the graphics library
+6. **Adaptability**: Support different screen sizes and aspect ratios
+7. **Fallbacks**: Use sensible defaults when resources are unavailable 

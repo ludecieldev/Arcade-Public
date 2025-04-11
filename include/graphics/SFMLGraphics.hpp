@@ -9,7 +9,9 @@
 #define SFML_GRAPHICS_HPP_
 
 #include "../interfaces/IGraphicsLibrary.hpp"
-#include "../Core.hpp"
+#include "../interfaces/ICore.hpp"
+#include "../utils/Event.hpp"
+#include "../utils/KeyCodes.hpp"
 #include <string>
 #include <vector>
 #include <map>
@@ -20,7 +22,7 @@
 
 namespace arcd {
 
-// Structure pour stocker les éléments à afficher
+// Helper structures for rendering
 struct TextDrawElement {
     sf::Text text;
     sf::Vector2f position;
@@ -37,23 +39,23 @@ class SFMLGraphics : public IGraphicsLibrary {
         int _height;
         int _lastKey;
         int _frameCounter;  // For animations
-        int _selectedMenuItem; // Pour stocker l'élément de menu sélectionné
         sf::RenderWindow _window;
         sf::Font _font;
         std::map<int, sf::Color> _colors;
-        std::optional<std::reference_wrapper<Core>> _core;
+        std::optional<std::reference_wrapper<ICore>> _core;
 
-        // Stockage des éléments de dessin
+        // Drawing elements storage
         std::vector<TextDrawElement> _textElements;
         std::vector<RectDrawElement> _rectElements;
 
         // Helper methods
         void redrawElements();
-        void drawTestScreen();
         void updateWindowSize();
         void showSplashScreen();
         int waitForKey(int timeoutMs);
         void waitForAnyKey();
+        int getKey();
+        int handleKeyPress(sf::Keyboard::Key key);
 
         // Initialize colors
         void initColors();
@@ -66,7 +68,17 @@ class SFMLGraphics : public IGraphicsLibrary {
         void drawVerticalLine(int x, int y, int height, Color color = Color::DEFAULT);
         void drawProgressBar(int x, int y, int width, int value, int maxValue, Color color = Color::DEFAULT);
         void drawBoldText(int x, int y, const std::string& text, Color color);
-        int handleKeyPress(sf::Keyboard::Key key);
+        
+        // Map SFML key code to our standard key codes
+        int mapKeyCode(sf::Keyboard::Key sfmlKey);
+        
+        // Text and drawing helper methods
+        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT);
+        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT);
+        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT);
+        
+        // Entity rendering
+        void renderEntity(const Entity& entity);
 
     public:
         SFMLGraphics();
@@ -79,27 +91,29 @@ class SFMLGraphics : public IGraphicsLibrary {
         // Display functions
         void clear() override;
         void refresh() override;
-
-        // Drawing functions with color support
-        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) override;
-        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) override;
-        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) override;
-
-        // Input handling
-        int getKey() override;
-
-        // Player name input
+        
+        // Input polling - returns none if no event is available
+        std::optional<std::unique_ptr<IEvent>> pollEvent() override;
+        
+        // Game rendering - renders the game state
+        void renderGameState(const IGameState& gameState) override;
+        
+        // UI rendering - for menus, etc.
+        void renderUI(const std::vector<UIElement>& uiElements) override;
+        
+        // Player interaction
         void getPlayerName(std::string& playerName) override;
 
-        // Library information
-        std::string getName() const override;
-
-        // Window dimensions
+        // Window information
         int getWidth() const override { return _width; }
         int getHeight() const override { return _height; }
 
+        // Library information
+        std::string getName() const override;
+        std::string getDescription() const override { return "SFML 2.6.2 graphics library"; }
+
         // Set core reference
-        void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }
+        void setCore(ICore& core) { _core = std::reference_wrapper<ICore>(core); }
 };
 
 }

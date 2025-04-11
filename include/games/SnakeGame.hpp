@@ -45,6 +45,10 @@ public:
     // Game information
     std::string getName() const override;
     std::string getDescription() const override;
+    
+    // Additional methods for game state query
+    bool isGameOver() const;
+    int getScore() const;
 
 private:
     static constexpr int BOARD_WIDTH = 30;

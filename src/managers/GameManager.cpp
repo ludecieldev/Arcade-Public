@@ -6,6 +6,7 @@
 */
 
 #include "managers/GameManager.hpp"
+#include <iostream>
 
 namespace arcd {
 
@@ -74,13 +75,14 @@ void GameManager::update(double deltaTime)
     _currentGame->update(deltaTime);
 }
 
-bool GameManager::processEvent(const IEvent& event)
+void GameManager::processEvent(const IEvent& event)
 {
-    if (!_currentGame || _isPaused) {
-        return false;
+    if (!_currentGame) {
+        return;
     }
 
-    return _currentGame->processEvent(event);
+    // Transmettre l'événement au jeu
+    _currentGame->processEvent(event);
 }
 
 std::unique_ptr<IGameState> GameManager::getGameState() const
@@ -95,11 +97,9 @@ std::unique_ptr<IGameState> GameManager::getGameState() const
 bool GameManager::isGameOver() const
 {
     if (!_currentGame) {
-        return true;
+        return false;
     }
-
-    auto gameState = _currentGame->getGameState();
-    return gameState->isGameOver();
+    return _currentGame->isGameOver();
 }
 
 int GameManager::getScore() const
@@ -107,9 +107,7 @@ int GameManager::getScore() const
     if (!_currentGame) {
         return 0;
     }
-
-    auto gameState = _currentGame->getGameState();
-    return gameState->getScore();
+    return _currentGame->getScore();
 }
 
 std::string GameManager::getName() const

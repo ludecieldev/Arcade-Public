@@ -74,6 +74,9 @@ class IGraphicsLibrary {
 
         // UI rendering - for menus, etc.
         virtual void renderUI(const std::vector<UIElement>& uiElements) = 0;
+        
+        // Player interaction - for getting player information
+        virtual void getPlayerName(std::string& playerName) = 0;
 
         // Window information
         virtual int getWidth() const = 0;
