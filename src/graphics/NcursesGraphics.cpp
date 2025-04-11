@@ -374,7 +374,8 @@ int NcursesGraphics::waitForKey(int timeoutMs)
     int result = poll(&pfd, 1, timeoutMs);
     
     if (result > 0 && (pfd.revents & POLLIN)) {
-        return getKey();
+        int ch = getch();
+        return mapKeyCode(ch);
     }
     
     return 0;
@@ -451,6 +452,164 @@ void NcursesGraphics::drawBoldText(int x, int y, const std::string& text, Color 
     attron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
     mvaddstr(y, x, text.c_str());
     attroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+}
+
+// Map ncurses key code to our standard key codes
+int NcursesGraphics::mapKeyCode(int ncursesKey)
+{
+    switch (ncursesKey) {
+        case KEY_UP: return KeyCode::UP;
+        case KEY_DOWN: return KeyCode::DOWN;
+        case KEY_LEFT: return KeyCode::LEFT;
+        case KEY_RIGHT: return KeyCode::RIGHT;
+        case 27: return KeyCode::ESC;
+        case KEY_BACKSPACE: return KeyCode::BACKSPACE;
+        case 10: return KeyCode::ENTER;
+        case ' ': return KeyCode::SPACE;
+        default: return ncursesKey;
+    }
+}
+
+// NEW METHODS
+
+std::optional<std::unique_ptr<IEvent>> NcursesGraphics::pollEvent()
+{
+    if (!_initialized) return std::nullopt;
+    
+    int ch = getch();
+    if (ch == ERR) return std::nullopt;
+    
+    int keyCode = mapKeyCode(ch);
+    return IEvent::createKeyEvent(keyCode, true);
+}
+
+void NcursesGraphics::renderEntity(const Entity& entity)
+{
+    if (!_initialized) return;
+    
+    // Convert string to Color enum
+    Color color = Color::WHITE;
+    if (entity.colorName == "BLACK") color = Color::BLACK;
+    else if (entity.colorName == "RED") color = Color::RED;
+    else if (entity.colorName == "GREEN") color = Color::GREEN;
+    else if (entity.colorName == "YELLOW") color = Color::YELLOW;
+    else if (entity.colorName == "BLUE") color = Color::BLUE;
+    else if (entity.colorName == "MAGENTA") color = Color::MAGENTA;
+    else if (entity.colorName == "CYAN") color = Color::CYAN;
+    
+    // Draw the entity
+    if (entity.symbol.length() == 1) {
+        // Single character entity
+        attron(COLOR_PAIR(static_cast<int>(color)));
+        for (int y = 0; y < entity.height; y++) {
+            for (int x = 0; x < entity.width; x++) {
+                mvaddch(entity.y + y, entity.x + x, entity.symbol[0]);
+            }
+        }
+        attroff(COLOR_PAIR(static_cast<int>(color)));
+    } else {
+        // String entity (just display at position)
+        drawText(entity.x, entity.y, entity.symbol, color);
+    }
+}
+
+void NcursesGraphics::renderGameState(const IGameState& gameState)
+{
+    if (!_initialized) return;
+    
+    // Clear the screen for fresh rendering
+    clear();
+    
+    // Center the game board on screen
+    int offsetX = (_width - gameState.getWidth()) / 2;
+    int offsetY = (_height - gameState.getHeight()) / 2;
+    
+    // Draw border around the game board
+    drawBox(offsetX - 1, offsetY - 1, gameState.getWidth() + 2, gameState.getHeight() + 2, Color::CYAN);
+    
+    // Draw game information (score, message)
+    std::string scoreText = "Score: " + std::to_string(gameState.getScore());
+    drawText(offsetX, offsetY - 2, scoreText, Color::YELLOW);
+    
+    if (gameState.isGameOver()) {
+        std::string gameOverText = "Game Over!";
+        drawBoldText((_width - gameOverText.length()) / 2, offsetY + gameState.getHeight() + 2, gameOverText, Color::RED);
+    }
+    
+    if (!gameState.getMessage().empty()) {
+        drawTextCentered(offsetY + gameState.getHeight() + 3, gameState.getMessage(), Color::WHITE);
+    }
+    
+    // Render all entities
+    for (const auto& entity : gameState.getEntities()) {
+        // Adjust entity position with offset
+        Entity adjustedEntity = entity;
+        adjustedEntity.x += offsetX;
+        adjustedEntity.y += offsetY;
+        renderEntity(adjustedEntity);
+    }
+    
+    // Refresh screen
+    refresh();
+}
+
+void NcursesGraphics::renderUI(const std::vector<UIElement>& uiElements)
+{
+    if (!_initialized) return;
+    
+    for (const auto& element : uiElements) {
+        switch (element.type) {
+            case UIElementType::TEXT: {
+                if (element.selected) {
+                    drawBoldText(element.x, element.y, element.text, element.color);
+                } else {
+                    drawText(element.x, element.y, element.text, element.color);
+                }
+                break;
+            }
+            case UIElementType::BUTTON: {
+                int textX = element.x + (element.width - element.text.length()) / 2;
+                int textY = element.y + element.height / 2;
+                drawBox(element.x, element.y, element.width, element.height, element.color);
+                if (element.selected) {
+                    drawBoldText(textX, textY, element.text, element.color);
+                } else {
+                    drawText(textX, textY, element.text, element.color);
+                }
+                break;
+            }
+            case UIElementType::LIST: {
+                auto items = std::any_cast<std::vector<std::string>>(
+                    element.properties.at("items"));
+                int selectedIndex = std::any_cast<int>(
+                    element.properties.at("selectedIndex"));
+                drawList(element.x, element.y, items, selectedIndex, element.color);
+                break;
+            }
+            case UIElementType::PROGRESS_BAR: {
+                int value = std::any_cast<int>(element.properties.at("value"));
+                int maxValue = std::any_cast<int>(element.properties.at("maxValue"));
+                drawProgressBar(element.x, element.y, element.width, value, maxValue, element.color);
+                break;
+            }
+            case UIElementType::PANEL: {
+                drawBox(element.x, element.y, element.width, element.height, element.color);
+                if (!element.text.empty()) {
+                    drawBoxWithTitle(element.x, element.y, element.width, element.height, element.text, element.color);
+                }
+                break;
+            }
+            case UIElementType::INPUT_FIELD: {
+                drawBox(element.x, element.y, element.width, element.height, element.color);
+                drawText(element.x + 1, element.y + element.height / 2, element.text, element.color);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    
+    refresh();
 }
 
 } // namespace arcd

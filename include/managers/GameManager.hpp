@@ -9,7 +9,7 @@
 #define GAME_MANAGER_HPP
 
 #include "../interfaces/IGameLibrary.hpp"
-#include "../interfaces/IGraphicsLibrary.hpp"
+#include "../interfaces/IEvent.hpp"
 #include <string>
 #include <memory>
 #include <chrono>
@@ -20,7 +20,6 @@ namespace arcd {
     class GameManager {
         private:
             std::unique_ptr<IGameLibrary> _currentGame;
-            std::chrono::time_point<std::chrono::high_resolution_clock> _lastUpdateTime;
             bool _isPaused;
             std::string _lastError;
 
@@ -40,16 +39,17 @@ namespace arcd {
             bool isPaused() const;
 
             // Game loop
-            void update();
-            void render(IGraphicsLibrary& graphicsLib);
-
-            // Input handling
-            void handleInput(int key);
-
-            // Game information
+            void update(double deltaTime);
+            
+            // Input handling - returns true if the event was handled
+            bool processEvent(const IEvent& event);
+            
+            // Game state
+            std::unique_ptr<IGameState> getGameState() const;
             bool isGameOver() const;
             int getScore() const;
             std::string getName() const;
+            std::string getDescription() const;
             void restart();
             std::string getLastError() const { return _lastError; }
     };

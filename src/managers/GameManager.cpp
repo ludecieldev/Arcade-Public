@@ -11,7 +11,6 @@ namespace arcd {
 
 GameManager::GameManager() : _isPaused(false)
 {
-    _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
 GameManager::~GameManager()
@@ -47,7 +46,6 @@ void GameManager::resetGame()
 {
     if (_currentGame) {
         _currentGame->restart();
-        _lastUpdateTime = std::chrono::high_resolution_clock::now();
         _isPaused = false;
     }
 }
@@ -60,7 +58,6 @@ void GameManager::pauseGame()
 void GameManager::resumeGame()
 {
     _isPaused = false;
-    _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
 bool GameManager::isPaused() const
@@ -68,31 +65,31 @@ bool GameManager::isPaused() const
     return _isPaused;
 }
 
-void GameManager::update()
+void GameManager::update(double deltaTime)
 {
-    if (!_currentGame) {
+    if (!_currentGame || _isPaused) {
         return;
     }
 
-    _currentGame->update();
+    _currentGame->update(deltaTime);
 }
 
-void GameManager::render(IGraphicsLibrary& graphics)
+bool GameManager::processEvent(const IEvent& event)
 {
-    if (!_currentGame) {
-        return;
+    if (!_currentGame || _isPaused) {
+        return false;
     }
 
-    _currentGame->render(graphics);
+    return _currentGame->processEvent(event);
 }
 
-void GameManager::handleInput(int key)
+std::unique_ptr<IGameState> GameManager::getGameState() const
 {
     if (!_currentGame) {
-        return;
+        return nullptr;
     }
 
-    _currentGame->handleInput(key);
+    return _currentGame->getGameState();
 }
 
 bool GameManager::isGameOver() const
@@ -101,7 +98,8 @@ bool GameManager::isGameOver() const
         return true;
     }
 
-    return _currentGame->isGameOver();
+    auto gameState = _currentGame->getGameState();
+    return gameState->isGameOver();
 }
 
 int GameManager::getScore() const
@@ -110,7 +108,8 @@ int GameManager::getScore() const
         return 0;
     }
 
-    return _currentGame->getScore();
+    auto gameState = _currentGame->getGameState();
+    return gameState->getScore();
 }
 
 std::string GameManager::getName() const
@@ -120,6 +119,15 @@ std::string GameManager::getName() const
     }
 
     return _currentGame->getName();
+}
+
+std::string GameManager::getDescription() const
+{
+    if (!_currentGame) {
+        return "No game is currently loaded";
+    }
+
+    return _currentGame->getDescription();
 }
 
 void GameManager::restart()

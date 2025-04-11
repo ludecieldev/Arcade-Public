@@ -1,7 +1,9 @@
 #include "games/SnakeGame.hpp"
-#include "interfaces/IGraphicsLibrary.hpp"
+#include "interfaces/IEvent.hpp"
+#include "utils/KeyCodes.hpp"
 #include <random>
 #include <chrono>
+#include <algorithm>
 
 namespace arcd {
 
@@ -12,7 +14,7 @@ SnakeGame::SnakeGame()
     , _nextDirection(Direction::RIGHT)
     , _gameOver(false)
     , _score(0)
-    , _updateCounter(0)
+    , _updateAccumulator(0.0)
     , _rng(std::random_device{}())
 {
     initialize();
@@ -33,19 +35,23 @@ void SnakeGame::initialize()
     _nextDirection = Direction::RIGHT;
     _gameOver = false;
     _score = 0;
-    _updateCounter = 0;
+    _updateAccumulator = 0.0;
     
     spawnFood();
+    
+    // Clear game state cache so it will be regenerated
+    _gameState.reset();
 }
 
-void SnakeGame::update()
+void SnakeGame::update(double deltaTime)
 {
     if (_gameOver) return;
     
-    _updateCounter++;
-    if (_updateCounter < UPDATE_INTERVAL / 50) return; // Update every 100ms
-    _updateCounter = 0;
+    _updateAccumulator += deltaTime;
     
+    if (_updateAccumulator < UPDATE_INTERVAL) return;
+    
+    _updateAccumulator -= UPDATE_INTERVAL;
     _direction = _nextDirection;
     moveSnake();
     
@@ -61,6 +67,9 @@ void SnakeGame::update()
     if (checkCollision(_snake.front())) {
         _gameOver = true;
     }
+    
+    // Clear game state cache so it will be regenerated
+    _gameState.reset();
 }
 
 void SnakeGame::moveSnake()
@@ -85,59 +94,97 @@ void SnakeGame::moveSnake()
     _snake.push_front(newHead);
 }
 
-void SnakeGame::handleInput(int key)
+bool SnakeGame::processEvent(const IEvent& event)
 {
-    switch (key) {
-        case IGraphicsLibrary::KEY_UP_CODE:
+    if (_gameOver) {
+        // Check for restart
+        if (event.getType() == EventType::KEY_PRESSED && event.getKeyCode() == KeyCode::RESTART) {
+            restart();
+            return true;
+        }
+        return false;
+    }
+    
+    if (event.getType() != EventType::KEY_PRESSED) {
+        return false;
+    }
+    
+    switch (event.getKeyCode()) {
+        case KeyCode::UP:
             if (_direction != Direction::DOWN)
                 _nextDirection = Direction::UP;
-            break;
-        case IGraphicsLibrary::KEY_DOWN_CODE:
+            return true;
+        case KeyCode::DOWN:
             if (_direction != Direction::UP)
                 _nextDirection = Direction::DOWN;
-            break;
-        case IGraphicsLibrary::KEY_LEFT_CODE:
+            return true;
+        case KeyCode::LEFT:
             if (_direction != Direction::RIGHT)
                 _nextDirection = Direction::LEFT;
-            break;
-        case IGraphicsLibrary::KEY_RIGHT_CODE:
+            return true;
+        case KeyCode::RIGHT:
             if (_direction != Direction::LEFT)
                 _nextDirection = Direction::RIGHT;
-            break;
+            return true;
+        default:
+            return false;
     }
 }
 
-void SnakeGame::render(IGraphicsLibrary& graphicsLib)
+std::unique_ptr<IGameState> SnakeGame::getGameState() const
 {
-    // Calculate board position to center it
-    int startX = (graphicsLib.getWidth() - BOARD_WIDTH * 2) / 2;
-    int startY = (graphicsLib.getHeight() - BOARD_HEIGHT) / 2;
-    
-    // Draw border
-    graphicsLib.drawBox(startX - 1, startY - 1, BOARD_WIDTH * 2 + 2, BOARD_HEIGHT + 2, Color::CYAN);
-    
-    // Draw snake
-    for (const auto& segment : _snake) {
-        if (segment == _snake.front()) {
-            graphicsLib.drawText(startX + segment.x * 2, startY + segment.y, "██", Color::GREEN);
-        } else {
-            graphicsLib.drawText(startX + segment.x * 2, startY + segment.y, "██", Color::WHITE);
-        }
+    // If we already have a cached state and nothing changed, return a copy of it
+    if (_gameState) {
+        return std::make_unique<GameState>(*static_cast<GameState*>(_gameState.get()));
     }
     
-    // Draw food
-    graphicsLib.drawText(startX + _food.x * 2, startY + _food.y, "██", Color::RED);
+    // Create a new game state
+    auto state = std::make_unique<GameState>(BOARD_WIDTH, BOARD_HEIGHT);
     
-    // Draw score
-    std::string scoreText = "Score: " + std::to_string(_score);
-    graphicsLib.drawText(startX, startY - 2, scoreText, Color::YELLOW);
+    // Set basic game information
+    state->setScore(_score);
+    state->setGameOver(_gameOver);
     
-    // Draw game over message
     if (_gameOver) {
-        std::string gameOverText = "Game Over! Press R to restart";
-        int textX = (graphicsLib.getWidth() - gameOverText.length()) / 2;
-        graphicsLib.drawText(textX, startY + BOARD_HEIGHT + 2, gameOverText, Color::RED);
+        state->setMessage("Game Over! Press 'r' to restart");
     }
+    
+    // Add snake entities
+    for (size_t i = 0; i < _snake.size(); i++) {
+        const auto& segment = _snake[i];
+        std::string colorName = (i == 0) ? "GREEN" : "WHITE"; // Head is green, body is white
+        
+        auto entity = GameState::createEntity(
+            EntityType::PLAYER,
+            segment.x,
+            segment.y,
+            "█", // Use a block character for the snake
+            colorName
+        );
+        
+        // For the head, store its direction in properties
+        if (i == 0) {
+            entity.properties["isHead"] = true;
+            entity.properties["direction"] = static_cast<int>(_direction);
+        }
+        
+        state->addEntity(entity);
+    }
+    
+    // Add food entity
+    auto foodEntity = GameState::createEntity(
+        EntityType::COLLECTIBLE,
+        _food.x,
+        _food.y,
+        "█", // Use a block character for food too
+        "RED"
+    );
+    state->addEntity(foodEntity);
+    
+    // Cache this state
+    _gameState = std::make_unique<GameState>(*state);
+    
+    return state;
 }
 
 void SnakeGame::spawnFood()
@@ -148,6 +195,9 @@ void SnakeGame::spawnFood()
     do {
         _food = {distX(_rng), distY(_rng)};
     } while (std::find(_snake.begin(), _snake.end(), _food) != _snake.end());
+    
+    // Clear game state cache so it will be regenerated
+    _gameState.reset();
 }
 
 bool SnakeGame::checkCollision(const Point& point) const
@@ -195,6 +245,11 @@ std::string SnakeGame::getName() const
     return "Snake";
 }
 
+std::string SnakeGame::getDescription() const
+{
+    return "Classic Snake game - eat food, grow longer, don't hit the walls or yourself!";
+}
+
 } // namespace arcd
 
 extern "C" {
@@ -203,7 +258,6 @@ extern "C" {
     }
     
     void destroyGameLibrary([[maybe_unused]] arcd::IGameLibrary* gameLib) {
-        // With smart pointers, this function is not needed anymore
-        // but we keep it for compatibility
+        // With smart pointers, this is not needed anymore
     }
 } 

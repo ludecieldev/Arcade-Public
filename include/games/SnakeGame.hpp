@@ -2,6 +2,8 @@
 #define SNAKE_GAME_HPP
 
 #include "../interfaces/IGameLibrary.hpp"
+#include "../utils/GameState.hpp"
+#include "../utils/KeyCodes.hpp"
 #include <vector>
 #include <deque>
 #include <random>
@@ -30,30 +32,30 @@ public:
 
     // Game lifecycle
     void initialize() override;
-    void update() override;
+    void update(double deltaTime) override;
     void restart() override;
     void cleanup() override;
 
     // Input handling
-    void handleInput(int key) override;
-
-    // Rendering
-    void render(IGraphicsLibrary& graphicsLib) override;
+    bool processEvent(const IEvent& event) override;
 
     // Game state
-    bool isGameOver() const override;
-    int getScore() const override;
+    std::unique_ptr<IGameState> getGameState() const override;
+
+    // Game information
     std::string getName() const override;
+    std::string getDescription() const override;
 
 private:
     static constexpr int BOARD_WIDTH = 30;
     static constexpr int BOARD_HEIGHT = 20;
     static constexpr int INITIAL_SNAKE_LENGTH = 4;
-    static constexpr int UPDATE_INTERVAL = 100; // milliseconds
+    static constexpr double UPDATE_INTERVAL = 0.1; // seconds
 
     void spawnFood();
     bool checkCollision(const Point& point) const;
     void moveSnake();
+    void updateEntities();
 
     std::deque<Point> _snake;
     Point _food;
@@ -61,8 +63,11 @@ private:
     Direction _nextDirection;
     bool _gameOver;
     int _score;
-    int _updateCounter;
+    double _updateAccumulator;
     std::mt19937 _rng;
+    
+    // Game state cache
+    mutable std::unique_ptr<GameState> _gameState;
 };
 
 } // namespace arcd
