@@ -8,9 +8,12 @@
 #ifndef I_GRAPHICS_LIBRARY_HPP
 #define I_GRAPHICS_LIBRARY_HPP
 
+#include "IGameState.hpp"
+#include "IEvent.hpp"
 #include <string>
 #include <vector>
 #include <memory>
+#include <optional>
 
 namespace arcd {
 
@@ -27,20 +30,33 @@ enum class Color {
     WHITE
 };
 
+// UI Element types for menus, etc.
+enum class UIElementType {
+    TEXT,
+    BUTTON,
+    LIST,
+    INPUT_FIELD,
+    PROGRESS_BAR,
+    PANEL,
+    CUSTOM
+};
+
+// UI Element for Core rendering
+struct UIElement {
+    UIElementType type;
+    int x;
+    int y;
+    int width;
+    int height;
+    std::string text;
+    Color color;
+    bool selected;
+    std::map<std::string, std::any> properties;
+};
+
 class IGraphicsLibrary {
     public:
         virtual ~IGraphicsLibrary() = default;
-
-        // Key constants
-        static constexpr int KEY_ESC_CODE = 27;
-        static constexpr int KEY_UP_CODE = 259;
-        static constexpr int KEY_DOWN_CODE = 258;
-        static constexpr int KEY_LEFT_CODE = 260;
-        static constexpr int KEY_RIGHT_CODE = 261;
-        static constexpr int KEY_ENTER_CODE = 10;
-        static constexpr int KEY_BACKSPACE_CODE = 127;
-        static constexpr int KEY_NEXT_LIB_CODE = '9';
-        static constexpr int KEY_NEXT_GAME_CODE = '7';
 
         // Initialization and cleanup
         virtual bool initialize() = 0;
@@ -50,23 +66,22 @@ class IGraphicsLibrary {
         virtual void clear() = 0;
         virtual void refresh() = 0;
 
-        // Drawing functions with color support
-        virtual void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) = 0;
-        virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
-        virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
+        // Input polling - returns none if no event is available
+        virtual std::optional<std::unique_ptr<IEvent>> pollEvent() = 0;
 
-        // Input handling - should return standardized key codes
-        virtual int getKey() = 0;
+        // Game rendering - renders the game state
+        virtual void renderGameState(const IGameState& gameState) = 0;
 
-        // Player name input
-        virtual void getPlayerName(std::string& playerName) = 0;
+        // UI rendering - for menus, etc.
+        virtual void renderUI(const std::vector<UIElement>& uiElements) = 0;
+
+        // Window information
+        virtual int getWidth() const = 0;
+        virtual int getHeight() const = 0;
 
         // Library information
         virtual std::string getName() const = 0;
-
-        // Window dimensions
-        virtual int getWidth() const = 0;
-        virtual int getHeight() const = 0;
+        virtual std::string getDescription() const = 0;
 };
 
 // Standard function for creating a unique_ptr to a graphics library
