@@ -117,19 +117,36 @@ namespace arcd {
 class IGraphicsLibrary {
 public:
     // Key codes
-    static const int KEY_UP_CODE = -1;
-    static const int KEY_DOWN_CODE = -2;
-    static const int KEY_LEFT_CODE = -3;
-    static const int KEY_RIGHT_CODE = -4;
-    static const int KEY_ENTER_CODE = -5;
-    static const int KEY_ESC_CODE = -6;
-    static const int KEY_BACKSPACE_CODE = -7;
-    static const int KEY_NEXT_LIB_CODE = -8;
-    static const int KEY_NEXT_GAME_CODE = -9;
+    static constexpr int KEY_UP_CODE = 259;
+    static constexpr int KEY_DOWN_CODE = 258;
+    static constexpr int KEY_LEFT_CODE = 260;
+    static constexpr int KEY_RIGHT_CODE = 261;
+    static constexpr int KEY_ENTER_CODE = 10;
+    static constexpr int KEY_ESC_CODE = 27;
+    static constexpr int KEY_BACKSPACE_CODE = 127;
+    static constexpr int KEY_NEXT_LIB_CODE = '9';
+    static constexpr int KEY_NEXT_GAME_CODE = '7';
+    static constexpr int KEY_SPACE_CODE = ' ';
+    static constexpr int KEY_TAB_CODE = '\t';
+    static constexpr int KEY_RESTART_GAME = 'r';
+    
+    // Mouse constants
+    static constexpr int MOUSE_LEFT_BUTTON = 1;
+    static constexpr int MOUSE_RIGHT_BUTTON = 2;
+    static constexpr int MOUSE_MIDDLE_BUTTON = 3;
+    
+    // Mouse event structure
+    struct MouseEvent {
+        int x;                // X coordinate
+        int y;                // Y coordinate
+        int button;           // Button code (MOUSE_LEFT_BUTTON, MOUSE_RIGHT_BUTTON, etc.)
+        bool pressed;         // true if button is pressed, false if released
+        bool hasEvent;        // true if there's a mouse event, false otherwise
+    };
     
     // Colors
     enum class Color {
-        DEFAULT, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
+        DEFAULT, BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
     };
     
     virtual ~IGraphicsLibrary() = default;
@@ -147,8 +164,19 @@ public:
     virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
     virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
     
+    // Standardized menu drawing
+    virtual void drawMenu(
+        const std::string& title,
+        const std::vector<std::string>& gameOptions,
+        const std::vector<std::string>& graphicOptions,
+        const std::string& playerName,
+        int selectedMenu,
+        int selectedGameIndex,
+        int selectedGraphicIndex) = 0;
+    
     // Input handling
     virtual int getKey() = 0;
+    virtual MouseEvent getMouse() = 0;
     
     // Player name input
     virtual void getPlayerName(std::string& playerName) = 0;
@@ -185,6 +213,7 @@ public:
 #### Input Handling
 
 - `int getKey()`: Returns the key code of the last key pressed, or 0 if no key has been pressed.
+- `MouseEvent getMouse()`: Returns information about the last mouse event, including position, button pressed, and event state.
 - `void getPlayerName(std::string& playerName)`: Implements player name input handling, updating the provided string.
 
 #### Information Functions
@@ -216,6 +245,7 @@ public:
     
     // Input handling
     virtual void handleInput(int key) = 0;
+    virtual void handleMouseInput(const IGraphicsLibrary::MouseEvent& event) = 0;
     
     // Game information
     virtual std::string getName() const = 0;
@@ -247,6 +277,7 @@ public:
 #### Input Handling
 
 - `void handleInput(int key)`: Processes a key input from the user.
+- `void handleMouseInput(const IGraphicsLibrary::MouseEvent& event)`: Processes a mouse input event from the user, including position and button information.
 
 #### Information Functions
 
