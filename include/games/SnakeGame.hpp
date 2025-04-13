@@ -58,6 +58,7 @@ private:
 
     // Game state
     bool _gameOver;
+    bool _exitRequested;  // Variable pour contrôler quand quitter vers le menu principal
     int _score;
     
     // Snake properties

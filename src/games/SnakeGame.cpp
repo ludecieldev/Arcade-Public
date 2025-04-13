@@ -6,6 +6,7 @@ namespace arcd {
 
 SnakeGame::SnakeGame()
     : _gameOver(false)
+    , _exitRequested(false)
     , _score(0)
     , _direction(Direction::RIGHT)
     , _nextDirection(Direction::RIGHT)
@@ -19,6 +20,7 @@ void SnakeGame::initialize()
 {
     // Reset game state
     _gameOver = false;
+    _exitRequested = false;
     _score = 0;
     _direction = Direction::RIGHT;
     _nextDirection = Direction::RIGHT;
@@ -88,8 +90,11 @@ void SnakeGame::handleInput(int key)
         return;
     }
     
-    // Don't handle other inputs when game is over
+    // Dans l'écran de game over, permettre de quitter au menu
     if (_gameOver) {
+        if (key == 'm' || key == 'M' || key == 'q' || key == 'Q' || key == IGraphicsLibrary::KEY_ESC_CODE) {
+            _exitRequested = true;
+        }
         return;
     }
     
@@ -124,13 +129,6 @@ void SnakeGame::handleInput(int key)
             
         case IGraphicsLibrary::KEY_NEXT_GAME_CODE: // '7'
             // Switch to next game (handled by Core)
-            break;
-            
-        case 'q':
-        case 'Q':
-        case 'm':
-        case 'M':
-            // Return to menu (handled by Core)
             break;
             
         case 'e':
@@ -256,7 +254,7 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
     int scoreBoxY;
     
     if (isAllegro) {
-        // For Allegro, position the score above the board with more space
+        // Pour Allegro, position the score above the board with more space
         scoreBoxY = startY - cellHeight * 3;
         graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, cellHeight, Color::WHITE);
         
@@ -277,24 +275,38 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
     
     // Draw game over message if applicable
     if (_gameOver) {
-        std::string gameOverText = "Game Over! Press 'R' to restart";
-        int gameOverBoxWidth = gameOverText.length() + 4;
+        std::string gameOverText = "Game Over!";
+        std::string restartText = "Press R to restart";
+        int gameOverBoxWidth = std::max(gameOverText.length(), restartText.length()) + 4;
         int gameOverX = startX + (BOARD_WIDTH * cellWidth - gameOverBoxWidth) / 2;
         int gameOverY;
         
         if (isAllegro) {
-            // For Allegro, position the game over message below the board with more space
-            gameOverY = startY + BOARD_HEIGHT * cellHeight + cellHeight * 2;
+            // Pour Allegro, centre le message "Game Over" dans le plateau
+            gameOverY = startY + (BOARD_HEIGHT * cellHeight) / 2 - cellHeight;
             // Draw box around game over message - adjust size for Allegro
-            graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, cellHeight * 2, Color::RED);
+            graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, cellHeight * 3, Color::RED);
+            
+            // Draw the message
+            int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length() * 8) / 2;
+            graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
+            
+            // Draw restart instruction
+            int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length() * 8) / 2;
+            graphicsLib.drawText(restartX, gameOverY + cellHeight, restartText, Color::RED);
         } else {
-            // For other libraries
-            gameOverY = startY + BOARD_HEIGHT + 3;
+            // Pour les autres bibliothèques, centre le message "Game Over" dans le plateau
+            gameOverY = startY + BOARD_HEIGHT / 2;
             graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
+            
+            // Draw the message
+            int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length()) / 2;
+            graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
+            
+            // Draw restart instruction
+            int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length()) / 2;
+            graphicsLib.drawText(restartX, gameOverY + 1, restartText, Color::RED);
         }
-        
-        // Draw the message
-        graphicsLib.drawText(gameOverX, gameOverY, gameOverText, Color::RED);
     }
     
     // Draw controls help
@@ -304,7 +316,8 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
         "L: Switch graphics",
         "G: Change game",
         "R: Restart game",
-        "Q/M: Back to menu", 
+        "M: Back to menu", 
+        "Q: Quit game",
         "ESC/E: Exit"
     };
     
@@ -343,31 +356,15 @@ void SnakeGame::moveSnake()
     switch (_direction) {
         case Direction::UP:
             newHead.y--;
-            // Wrap around vertically if needed
-            if (newHead.y < 0) {
-                newHead.y = BOARD_HEIGHT - 1;
-            }
             break;
         case Direction::DOWN:
             newHead.y++;
-            // Wrap around vertically if needed
-            if (newHead.y >= BOARD_HEIGHT) {
-                newHead.y = 0;
-            }
             break;
         case Direction::LEFT:
             newHead.x--;
-            // Wrap around horizontally if needed
-            if (newHead.x < 0) {
-                newHead.x = BOARD_WIDTH - 1;
-            }
             break;
         case Direction::RIGHT:
             newHead.x++;
-            // Wrap around horizontally if needed
-            if (newHead.x >= BOARD_WIDTH) {
-                newHead.x = 0;
-            }
             break;
     }
     
@@ -377,7 +374,10 @@ void SnakeGame::moveSnake()
 
 bool SnakeGame::checkCollision(const Position& pos)
 {
-    // No wall collisions since we're implementing a cyclic play area
+    // Vérifier les collisions avec les murs
+    if (pos.x < 0 || pos.x >= BOARD_WIDTH || pos.y < 0 || pos.y >= BOARD_HEIGHT) {
+        return true;
+    }
     
     // Check for self collision (skip the head)
     auto it = _snake.begin();
@@ -429,7 +429,7 @@ void SnakeGame::cleanup()
 
 bool SnakeGame::isGameOver() const
 {
-    return _gameOver;
+    return _exitRequested;
 }
 
 int SnakeGame::getScore() const
