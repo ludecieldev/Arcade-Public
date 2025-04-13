@@ -82,7 +82,6 @@ class NcursesGraphics : public IGraphicsLibrary {
 
         // Input handling
         int getKey() override;
-        MouseEvent getMouse() override;
 
         // Player name input
         void getPlayerName(std::string& playerName) override;

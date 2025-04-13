@@ -63,17 +63,17 @@ graphicals: $(GRAPHICALS_LIBS)
 
 lib/arcade_ncurses.so: src/graphics/NcursesGraphics.cpp
 	@mkdir -p lib
-	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< -lncurses
 	@echo -e "${GREEN}Graphicals library built: $@${NC}"
 
 lib/arcade_sdl2.so: src/graphics/SDL2Graphics.cpp
 	@mkdir -p lib
-	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< -lSDL2 -lSDL2_ttf
 	@echo -e "${GREEN}Graphicals library built: $@${NC}"
 
 lib/arcade_allegro5.so: src/graphics/Allegro5Graphics.cpp
 	@mkdir -p lib
-	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< -lallegro -lallegro_font -lallegro_ttf -lallegro_primitives
 	@echo -e "${GREEN}Graphicals library built: $@${NC}"
 
 debug: CXXFLAGS += $(DEBUG_FLAGS)

@@ -88,9 +88,6 @@ bool NcursesGraphics::initialize()
     start_color();         // Enable colors
     use_default_colors();  // Use terminal's default colors
     
-    // Activer le support de la souris
-    mousemask(ALL_MOUSE_EVENTS, NULL);
-    
     // Initialize color pairs
     init_pair(1, COLOR_BLACK, -1);
     init_pair(2, COLOR_RED, -1);
@@ -390,10 +387,6 @@ void NcursesGraphics::showSplashScreen()
     // Message de bienvenue
     std::string welcome = "Welcome to the Arcade Game Platform";
     drawTextCentered(5, welcome, Color::WHITE);
-    
-    // Message d'initialisation de la souris
-    std::string mouseMsg = "Mouse support initialized";
-    drawTextCentered(7, mouseMsg, Color::GREEN);
     
     // Instruction
     std::string instruction = "Press any key to continue...";
