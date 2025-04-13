@@ -343,7 +343,21 @@ void NcursesGraphics::flushInputBuffer()
 
 void NcursesGraphics::initColors()
 {
-    // Not needed - we use ANSI escape codes
+    if (!_initialized) return;
+    
+    // Utiliser les couleurs par défaut du terminal
+    use_default_colors();
+    
+    // Initialiser les paires de couleurs
+    init_pair(static_cast<int>(Color::DEFAULT), -1, -1);
+    init_pair(static_cast<int>(Color::BLACK), COLOR_BLACK, -1);
+    init_pair(static_cast<int>(Color::RED), COLOR_RED, -1);
+    init_pair(static_cast<int>(Color::GREEN), COLOR_GREEN, -1);
+    init_pair(static_cast<int>(Color::YELLOW), COLOR_YELLOW, -1);
+    init_pair(static_cast<int>(Color::BLUE), COLOR_BLUE, -1);
+    init_pair(static_cast<int>(Color::MAGENTA), COLOR_MAGENTA, -1);
+    init_pair(static_cast<int>(Color::CYAN), COLOR_CYAN, -1);
+    init_pair(static_cast<int>(Color::WHITE), COLOR_WHITE, -1);
 }
 
 int NcursesGraphics::getColorPair(int fg, [[maybe_unused]] int bg)
@@ -363,17 +377,33 @@ void NcursesGraphics::showSplashScreen()
     
     clear();
     
-    // Draw title box
-    int titleWidth = 40;
-    int titleHeight = 3;
-    int startX = (_width - titleWidth) / 2;
-    int startY = (_height - titleHeight) / 2;
+    // Dessiner le cadre pour l'écran de démarrage
+    drawBox(2, 1, _width - 4, _height - 2, Color::CYAN);
     
-    drawBox(startX, startY, titleWidth, titleHeight, Color::CYAN);
-    drawBoldText(startX + (titleWidth - 6) / 2, startY + 1, "ARCADE", Color::CYAN);
+    // Titre de l'application
+    std::string title = "ARCADE";
+    drawTextCentered(3, title, Color::YELLOW);
+    
+    // Message de bienvenue
+    std::string welcome = "Welcome to the Arcade Game Platform";
+    drawTextCentered(5, welcome, Color::WHITE);
+    
+    // Message d'initialisation de la souris
+    std::string mouseMsg = "Mouse support initialized";
+    drawTextCentered(7, mouseMsg, Color::GREEN);
+    
+    // Instruction
+    std::string instruction = "Press any key to continue...";
+    drawTextCentered(_height - 5, instruction, Color::WHITE);
     
     refresh();
-    napms(2000);
+    
+    // Attendre une touche (avec timeout)
+    timeout(2000); // Timeout de 2 secondes
+    getch();       // On ignore la valeur de retour
+    timeout(10);   // Retour au timeout normal
+    
+    // Effacer l'écran avant de continuer
     clear();
     refresh();
 }
@@ -612,6 +642,13 @@ void NcursesGraphics::drawMenu(
     }
     
     refresh();
+}
+
+IGraphicsLibrary::MouseEvent NcursesGraphics::getMouse()
+{
+    MouseEvent event = {0, 0, 0, false, false};
+
+    return event;
 }
 
 } // namespace arcd
