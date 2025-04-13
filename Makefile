@@ -19,17 +19,17 @@ CORE_NAME = arcade
 
 # Game sources
 GAME_SRC = src/games/SnakeGame.cpp
-GAME_LIBS = $(patsubst src/games/%.cpp,lib/arcade_%.so,$(GAME_SRC))
+GAME_LIBS = lib/arcade_snake.so
 
-# Graphics sources
-GRAPHICS_SRC = src/graphics/NcursesGraphics.cpp
-GRAPHICS_SRC += src/graphics/SDL2Graphics.cpp
-GRAPHICS_SRC += src/graphics/SFMLGraphics.cpp
-GRAPHICS_LIBS = $(patsubst src/graphics/%.cpp,lib/arcade_%.so,$(GRAPHICS_SRC))
+# Graphicals sources
+GRAPHICALS_SRC = src/graphics/NcursesGraphics.cpp
+GRAPHICALS_SRC += src/graphics/SDL2Graphics.cpp
+GRAPHICALS_SRC += src/graphics/Allegro5Graphics.cpp
+GRAPHICALS_LIBS = lib/arcade_ncurses.so lib/arcade_sdl2.so lib/arcade_allegro5.so
 
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC -fno-gnu-unique
-LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system -lncurses -lSDL2 -lSDL2_ttf
+LDFLAGS = -lallegro -lallegro_font -lallegro_ttf -lallegro_primitives -lncurses -lSDL2 -lSDL2_ttf
 
 # Debug flags
 DEBUG_FLAGS = -g3
@@ -44,7 +44,7 @@ NC = \033[0m
 
 .SILENT:
 
-all: core games graphics
+all: core games graphicals
 
 core: $(CORE_NAME)
 
@@ -54,17 +54,27 @@ $(CORE_NAME): $(CORE_OBJ)
 
 games: $(GAME_LIBS)
 
-lib/arcade_%.so: src/games/%.cpp
+lib/arcade_snake.so: src/games/SnakeGame.cpp
 	@mkdir -p lib
 	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
 	@echo -e "${GREEN}Game library built: $@${NC}"
 
-graphics: $(GRAPHICS_LIBS)
+graphicals: $(GRAPHICALS_LIBS)
 
-lib/arcade_%.so: src/graphics/%.cpp
+lib/arcade_ncurses.so: src/graphics/NcursesGraphics.cpp
 	@mkdir -p lib
 	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
-	@echo -e "${GREEN}Graphics library built: $@${NC}"
+	@echo -e "${GREEN}Graphicals library built: $@${NC}"
+
+lib/arcade_sdl2.so: src/graphics/SDL2Graphics.cpp
+	@mkdir -p lib
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+	@echo -e "${GREEN}Graphicals library built: $@${NC}"
+
+lib/arcade_allegro5.so: src/graphics/Allegro5Graphics.cpp
+	@mkdir -p lib
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+	@echo -e "${GREEN}Graphicals library built: $@${NC}"
 
 debug: CXXFLAGS += $(DEBUG_FLAGS)
 debug: fclean all
@@ -79,9 +89,9 @@ clean:
 	@echo -e "${YELLOW}LUD'S MAKEFILE | ${RED}Cleaning object and coverage files...${NC}"
 
 fclean: clean
-	@rm -f $(CORE_NAME) $(GAME_LIBS) $(GRAPHICS_LIBS)
+	@rm -f $(CORE_NAME) $(GAME_LIBS) $(GRAPHICALS_LIBS)
 	@echo -e "${YELLOW}LUD'S MAKEFILE | ${RED}Full cleanup complete. All executables removed.${NC}"
 
 re: fclean all
 
-.PHONY: all clean fclean re core games graphics debug valgrind
+.PHONY: all clean fclean re core games graphicals debug valgrind
