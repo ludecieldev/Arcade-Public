@@ -807,7 +807,40 @@ void Core::renderLeaderboard()
         
         if (!_gameOptions.empty()) {
             // Get scores for the selected game
-            std::vector<Score> scores = _scoreManager->getScores(gameName);
+            // Trouver le nom réel du jeu à partir du chemin de la bibliothèque
+            std::string gamePath = gameName;
+            std::string realGameName = "";
+            
+            if (_libManager->hasGameLibrary() && _gameOptions[_selectedLeaderboardGame] == _libManager->getCurrentGameLibraryName()) {
+                // Si le jeu sélectionné est le jeu actuel, utiliser getName()
+                realGameName = _libManager->getCurrentGameLibrary().getName();
+            } else {
+                // Sinon, extraire le nom à partir du chemin du fichier
+                // Par exemple, convertir "./lib/arcade_snake.so" en "Snake"
+                std::string filename = gamePath;
+                size_t lastSlash = filename.find_last_of('/');
+                if (lastSlash != std::string::npos) {
+                    filename = filename.substr(lastSlash + 1);
+                }
+                
+                // Enlever le préfixe (arcade_) et l'extension (.so)
+                if (filename.find("arcade_") == 0) {
+                    filename = filename.substr(7); // Enlever "arcade_"
+                }
+                size_t dotPos = filename.find_last_of('.');
+                if (dotPos != std::string::npos) {
+                    filename = filename.substr(0, dotPos);
+                }
+                
+                // Première lettre en majuscule
+                if (!filename.empty()) {
+                    filename[0] = std::toupper(filename[0]);
+                }
+                
+                realGameName = filename;
+            }
+            
+            std::vector<Score> scores = _scoreManager->getScores(realGameName);
             
             if (scores.empty()) {
                 std::string noScores = "No scores yet for this game";

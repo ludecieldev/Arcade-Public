@@ -22,3 +22,4 @@ arcade
 *.def
 *.manifest
 *.o
+scores.dat
