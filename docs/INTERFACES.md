@@ -21,19 +21,36 @@ The `IGraphicsLibrary` interface is defined in `include/interfaces/IGraphicsLibr
 class IGraphicsLibrary {
 public:
     // Common key codes for consistent input handling across graphics libraries
-    static const int KEY_UP_CODE = -1;
-    static const int KEY_DOWN_CODE = -2;
-    static const int KEY_LEFT_CODE = -3;
-    static const int KEY_RIGHT_CODE = -4;
-    static const int KEY_ENTER_CODE = -5;
-    static const int KEY_ESC_CODE = -6;
-    static const int KEY_BACKSPACE_CODE = -7;
-    static const int KEY_NEXT_LIB_CODE = -8;
-    static const int KEY_NEXT_GAME_CODE = -9;
+    static constexpr int KEY_UP_CODE = 259;           // Up arrow key
+    static constexpr int KEY_DOWN_CODE = 258;         // Down arrow key
+    static constexpr int KEY_LEFT_CODE = 260;         // Left arrow key
+    static constexpr int KEY_RIGHT_CODE = 261;        // Right arrow key
+    static constexpr int KEY_ENTER_CODE = 10;         // Enter/Return key
+    static constexpr int KEY_ESC_CODE = 27;           // Escape key
+    static constexpr int KEY_BACKSPACE_CODE = 127;    // Backspace key
+    static constexpr int KEY_NEXT_LIB_CODE = '9';     // Key to switch to next graphics library
+    static constexpr int KEY_NEXT_GAME_CODE = '7';    // Key to switch to next game
+    static constexpr int KEY_SPACE_CODE = ' ';        // Space key
+    static constexpr int KEY_TAB_CODE = '\t';         // Tab key
+    static constexpr int KEY_RESTART_GAME = 'r';      // Key to restart the game
+    
+    // Mouse constants
+    static constexpr int MOUSE_LEFT_BUTTON = 1;       // Left mouse button
+    static constexpr int MOUSE_RIGHT_BUTTON = 2;      // Right mouse button
+    static constexpr int MOUSE_MIDDLE_BUTTON = 3;     // Middle mouse button (scroll wheel)
+    
+    // Mouse event structure
+    struct MouseEvent {
+        int x;                // X coordinate
+        int y;                // Y coordinate
+        int button;           // Button code (MOUSE_LEFT_BUTTON, MOUSE_RIGHT_BUTTON, etc.)
+        bool pressed;         // true if button is pressed, false if released
+        bool hasEvent;        // true if there's a mouse event, false otherwise
+    };
     
     // Colors for rendering
     enum class Color {
-        DEFAULT, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
+        DEFAULT, BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
     };
     
     virtual ~IGraphicsLibrary() = default;
@@ -51,8 +68,19 @@ public:
     virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
     virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
     
+    // Standardized menu drawing
+    virtual void drawMenu(
+        const std::string& title,
+        const std::vector<std::string>& gameOptions,
+        const std::vector<std::string>& graphicOptions,
+        const std::string& playerName,
+        int selectedMenu,
+        int selectedGameIndex,
+        int selectedGraphicIndex) = 0;
+    
     // Input handling
     virtual int getKey() = 0;
+    virtual MouseEvent getMouse() = 0;
     
     // Player name input
     virtual void getPlayerName(std::string& playerName) = 0;
@@ -87,6 +115,7 @@ public:
 #### Input Handling
 
 - `int getKey()`: Returns the key code of the last key pressed, or 0 if no key has been pressed.
+- `MouseEvent getMouse()`: Returns information about the last mouse event, including position, button pressed, and event state.
 - `void getPlayerName(std::string& playerName)`: Implements player name input handling, updating the provided string.
 
 #### Information Functions
@@ -101,15 +130,40 @@ The `IGraphicsLibrary` interface defines standard key codes for consistent input
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| KEY_UP_CODE | -1 | Up arrow key |
-| KEY_DOWN_CODE | -2 | Down arrow key |
-| KEY_LEFT_CODE | -3 | Left arrow key |
-| KEY_RIGHT_CODE | -4 | Right arrow key |
-| KEY_ENTER_CODE | -5 | Enter/Return key |
-| KEY_ESC_CODE | -6 | Escape key |
-| KEY_BACKSPACE_CODE | -7 | Backspace key |
-| KEY_NEXT_LIB_CODE | -8 | Key to switch to next graphics library |
-| KEY_NEXT_GAME_CODE | -9 | Key to switch to next game |
+| KEY_UP_CODE | 259 | Up arrow key |
+| KEY_DOWN_CODE | 258 | Down arrow key |
+| KEY_LEFT_CODE | 260 | Left arrow key |
+| KEY_RIGHT_CODE | 261 | Right arrow key |
+| KEY_ENTER_CODE | 10 | Enter/Return key |
+| KEY_ESC_CODE | 27 | Escape key |
+| KEY_BACKSPACE_CODE | 127 | Backspace key |
+| KEY_NEXT_LIB_CODE | '9' | Key to switch to next graphics library |
+| KEY_NEXT_GAME_CODE | '7' | Key to switch to next game |
+| KEY_SPACE_CODE | ' ' | Space key |
+| KEY_TAB_CODE | '\t' | Tab key |
+| KEY_RESTART_GAME | 'r' | Key to restart the game |
+
+### Mouse Constants
+
+The interface also defines standard mouse button codes:
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| MOUSE_LEFT_BUTTON | 1 | Left mouse button |
+| MOUSE_RIGHT_BUTTON | 2 | Right mouse button |
+| MOUSE_MIDDLE_BUTTON | 3 | Middle mouse button (scroll wheel) |
+
+### Mouse Event Structure
+
+The `MouseEvent` structure contains information about mouse events:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| x | int | X coordinate of the mouse position |
+| y | int | Y coordinate of the mouse position |
+| button | int | Button code (LEFT, RIGHT, MIDDLE) |
+| pressed | bool | True if button is pressed, false if released |
+| hasEvent | bool | True if a mouse event has occurred, false otherwise |
 
 ### Colors
 
@@ -118,6 +172,7 @@ The `Color` enum defines standard colors for rendering:
 | Color | Description |
 |-------|-------------|
 | DEFAULT | Default color (typically white) |
+| BLACK | Black color |
 | RED | Red color |
 | GREEN | Green color |
 | YELLOW | Yellow color |
