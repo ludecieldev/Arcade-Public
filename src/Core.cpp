@@ -89,7 +89,7 @@ void Core::run()
             
             auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
             
-            // Process input
+            // Process keyboard input
             int key = graphicsLib.getKey();
             
             // Check for exit key
@@ -98,7 +98,7 @@ void Core::run()
                 continue;
             }
             
-            // Handle input based on current state
+            // Handle keyboard input based on current state
             switch (_state) {
                 case AppState::MENU:
                     handleMenuInput(key);
@@ -479,9 +479,7 @@ void Core::handleGameInput(int key)
                 break;
             case 'r':
             case 'R':
-                if (game.isGameOver()) {
-                    game.restart();
-                }
+                game.restart();
                 break;
             case 'q':
             case 'Q':
