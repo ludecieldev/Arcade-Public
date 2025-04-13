@@ -12,6 +12,10 @@
 
 namespace arcd {
 
+/**
+ * @brief Constructor for ScoreManager
+ * Initializes the score manager with an empty score map
+ */
 void ScoreManager::addScore(const std::string& playerName, const std::string& gameName, int score)
 {
     Score newScore(playerName, gameName, score);
@@ -22,6 +26,11 @@ void ScoreManager::addScore(const std::string& playerName, const std::string& ga
               [](const Score& a, const Score& b) { return a.value > b.value; });
 }
 
+/**
+ * @brief Retrieves all scores for a specific game
+ * @param gameName Name of the game
+ * @return Vector of scores for the specified game
+ */
 std::vector<Score> ScoreManager::getScores(const std::string& gameName) const
 {
     auto it = _scores.find(gameName);
@@ -35,6 +44,11 @@ std::vector<Score> ScoreManager::getScores(const std::string& gameName) const
     return {};
 }
 
+/**
+ * @brief Retrieves the best score for a specific game
+ * @param gameName Name of the game
+ * @return Best score for the specified game
+ */
 Score ScoreManager::getBestScore(const std::string& gameName) const
 {
     auto scores = getScores(gameName);
@@ -44,11 +58,20 @@ Score ScoreManager::getBestScore(const std::string& gameName) const
     return Score("", gameName, 0);
 }
 
+/**
+ * @brief Retrieves all scores for all games
+ * @return Map of game names to their respective scores
+ */
 std::map<std::string, std::vector<Score>> ScoreManager::getAllScores() const
 {
     return _scores;
 }
 
+/**
+ * @brief Saves the scores to a file
+ * @param filename Name of the file to save the scores to
+ * @return True if successful, false otherwise
+ */
 bool ScoreManager::saveScores(const std::string& filename) const
 {
     try {
@@ -70,6 +93,11 @@ bool ScoreManager::saveScores(const std::string& filename) const
     }
 }
 
+/**
+ * @brief Loads scores from a file
+ * @param filename Name of the file to load the scores from
+ * @return True if successful, false otherwise
+ */
 bool ScoreManager::loadScores(const std::string& filename)
 {
     try {
