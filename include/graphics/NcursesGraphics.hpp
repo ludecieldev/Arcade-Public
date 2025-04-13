@@ -104,7 +104,8 @@ class NcursesGraphics : public IGraphicsLibrary {
             const std::string& playerName,
             int selectedMenu,
             int selectedGameIndex,
-            int selectedGraphicIndex) override;
+            int selectedGraphicIndex,
+            int playerOptionSelected = 0) override;
 };
 
 }

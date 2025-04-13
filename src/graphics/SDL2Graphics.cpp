@@ -285,7 +285,8 @@ void SDL2Graphics::drawMenu(
     const std::string& playerName,
     int selectedMenu,
     int selectedGameIndex,
-    int selectedGraphicIndex)
+    int selectedGraphicIndex,
+    int playerOptionSelected)
 {
     if (!_initialized) return;
     
@@ -363,14 +364,16 @@ void SDL2Graphics::drawMenu(
     // Draw player name box
     bool isPlayerBoxSelected = (selectedMenu == 2);
     Color playerBoxColor = isPlayerBoxSelected ? Color::YELLOW : Color::WHITE;
-    drawBoxWithTitle(startX + 2 * (boxWidth + spacing), startY, boxWidth, boxHeight, "Player Name", playerBoxColor);
+    drawBoxWithTitle(startX + 2 * (boxWidth + spacing), startY, boxWidth, boxHeight, "Player: " + playerName, playerBoxColor);
     
-    // Display player name (shortened if too long)
-    std::string displayName = playerName;
-    if (displayName.length() > static_cast<size_t>(boxWidth - 4)) {
-        displayName = displayName.substr(0, boxWidth - 7) + "...";
+    // Draw player options
+    std::vector<std::string> playerOptions = {"Change Nickname", "Leaderboard"};
+    for (size_t i = 0; i < playerOptions.size(); i++) {
+        Color itemColor = (isPlayerBoxSelected && static_cast<int>(i) == playerOptionSelected) 
+                          ? Color::YELLOW : Color::WHITE;
+        drawText(startX + 2 * (boxWidth + spacing) + 2, startY + 3 + static_cast<int>(i), 
+                playerOptions[i], itemColor);
     }
-    drawText(startX + 2 * (boxWidth + spacing) + 2, startY + 3, displayName, playerBoxColor);
     
     // Draw instructions with clear spacing
     int instructionY = startY + boxHeight + 2;

@@ -88,7 +88,8 @@ class SDL2Graphics : public IGraphicsLibrary {
             const std::string& playerName,
             int selectedMenu,
             int selectedGameIndex,
-            int selectedGraphicIndex) override;
+            int selectedGraphicIndex,
+            int playerOptionSelected = 0) override;
 
         // Set core reference
         void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }

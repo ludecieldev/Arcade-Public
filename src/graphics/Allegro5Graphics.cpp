@@ -481,7 +481,8 @@ void Allegro5Graphics::drawMenu(
     const std::string& playerName,
     int selectedMenu,
     int selectedGameIndex,
-    int selectedGraphicIndex)
+    int selectedGraphicIndex,
+    int playerOptionSelected)
 {
     if (!_initialized) return;
     
@@ -570,8 +571,16 @@ void Allegro5Graphics::drawMenu(
     
     // Boîte du joueur
     drawBox(startX + 2 * (boxWidth + margin), boxesY, boxWidth, boxHeight, isPlayerSelected ? Color::YELLOW : Color::WHITE);
-    drawText(startX + 2 * (boxWidth + margin) + 10, boxesY + 20, "Player Name", isPlayerSelected ? Color::YELLOW : Color::WHITE);
-    drawText(startX + 2 * (boxWidth + margin) + 20, boxesY + 60, playerName, isPlayerSelected ? Color::YELLOW : Color::WHITE);
+    drawText(startX + 2 * (boxWidth + margin) + 10, boxesY + 20, "Player: " + playerName, isPlayerSelected ? Color::YELLOW : Color::WHITE);
+    
+    // Draw player options
+    std::vector<std::string> playerOptions = {"Change Nickname", "Leaderboard"};
+    itemY = boxesY + 60;
+    for (size_t i = 0; i < playerOptions.size(); i++) {
+        Color itemColor = (isPlayerSelected && static_cast<int>(i) == playerOptionSelected) ? Color::YELLOW : Color::WHITE;
+        drawText(startX + 2 * (boxWidth + margin) + 20, itemY, playerOptions[i], itemColor);
+        itemY += lineSpacing;
+    }
     
     // Instructions - utilisation d'une approche avec des boîtes distinctes pour chaque instruction
     const int instructionsStartY = boxesY + boxHeight + 50;

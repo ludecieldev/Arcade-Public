@@ -497,7 +497,8 @@ void NcursesGraphics::drawMenu(
     const std::string& playerName,
     int selectedMenu,
     int selectedGameIndex,
-    int selectedGraphicIndex)
+    int selectedGraphicIndex,
+    int playerOptionSelected)
 {
     if (!_initialized) return;
     
@@ -590,20 +591,22 @@ void NcursesGraphics::drawMenu(
     // Draw player name box
     bool isPlayerBoxSelected = (selectedMenu == 2);
     Color playerBoxColor = isPlayerBoxSelected ? Color::YELLOW : Color::WHITE;
-    drawBoxWithTitle(startX + 2 * (boxWidth + spacing), startY, boxWidth, boxHeight, "Player", playerBoxColor);
+    drawBoxWithTitle(startX + 2 * (boxWidth + spacing), startY, boxWidth, boxHeight, "Player: " + playerName, playerBoxColor);
     
-    // Display player name (shortened if too long)
-    std::string displayName = playerName;
-    if (displayName.length() > static_cast<size_t>(boxWidth - 4)) {
-        displayName = displayName.substr(0, boxWidth - 7) + "...";
-    }
-    
-    if (isPlayerBoxSelected) {
-        attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
-        mvprintw(startY + 2, startX + 2 * (boxWidth + spacing) + 2, "> %s", displayName.c_str());
-        attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
-    } else {
-        drawText(startX + 2 * (boxWidth + spacing) + 2, startY + 2, displayName, playerBoxColor);
+    // Draw player options
+    std::vector<std::string> playerOptions = {"Change Nickname", "Leaderboard"};
+    for (size_t i = 0; i < playerOptions.size(); i++) {
+        Color itemColor = (isPlayerBoxSelected && static_cast<int>(i) == playerOptionSelected) 
+                          ? Color::YELLOW : Color::WHITE;
+        
+        if (isPlayerBoxSelected && static_cast<int>(i) == playerOptionSelected) {
+            attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            mvprintw(startY + 2 + static_cast<int>(i), startX + 2 * (boxWidth + spacing) + 2, "> %s", playerOptions[i].c_str());
+            attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+        } else {
+            drawText(startX + 2 * (boxWidth + spacing) + 2, startY + 2 + static_cast<int>(i), 
+                    playerOptions[i], itemColor);
+        }
     }
     
     // Draw instructions box with large spacing
