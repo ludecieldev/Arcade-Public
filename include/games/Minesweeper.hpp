@@ -24,6 +24,8 @@ private:
     bool _gameOver;
     bool _win;
     int _flagsUsed;
+    int _cursorRow;
+    int _cursorCol;
 
     // Helper methods
     void initializeGrid();
@@ -42,8 +44,8 @@ public:
     void update() override;
     void render(IGraphicsLibrary& graphics) override;
     void handleInput(int key) override;
-    void handleMouseInput(const IGraphicsLibrary::MouseEvent& mouseEvent) override;
     bool isGameOver() const override;
+    void cleanup() override;
     int getScore() const override;
     std::string getName() const override;
     void restart() override;
