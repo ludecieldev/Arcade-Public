@@ -85,7 +85,7 @@ valgrind: debug
 	@valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose ./$(CORE_NAME) ./lib/arcade_NcursesGraphics.so
 
 clean:
-	@rm -f $(CORE_OBJ) *.gcda *.gcno
+	@rm -f $(CORE_OBJ) *.gcda *.gcno scores.dat
 	@echo -e "${YELLOW}LUD'S MAKEFILE | ${RED}Cleaning object and coverage files...${NC}"
 
 fclean: clean

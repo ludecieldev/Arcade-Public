@@ -323,7 +323,8 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
         "R: Restart game",
         "M: Back to menu", 
         "Q: Quit game",
-        "ESC/E: Exit"
+        "ESC/E: Exit",
+        "MENU: L for Leaderboard"
     };
     
     int controlsX = startX + BOARD_WIDTH * cellWidth + 4;
@@ -434,7 +435,7 @@ void SnakeGame::cleanup()
 
 bool SnakeGame::isGameOver() const
 {
-    return _exitRequested;
+    return _gameOver || _exitRequested;
 }
 
 int SnakeGame::getScore() const

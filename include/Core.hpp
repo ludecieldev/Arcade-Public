@@ -21,6 +21,7 @@ namespace arcd {
         GAME,
         SELECT_GAME,
         SELECT_GRAPHICS,
+        LEADERBOARD,
         EXIT
     };
 
@@ -37,6 +38,7 @@ namespace arcd {
             int _selectedSubMenuOption;
             int _selectedGameIndex;
             int _selectedGraphicsIndex;
+            int _selectedLeaderboardGame; // Index of currently selected game for leaderboard
             std::vector<std::string> _menuOptions;
             std::vector<std::string> _gameOptions;
             std::vector<std::string> _graphicsOptions;
@@ -46,9 +48,11 @@ namespace arcd {
             void handleMenuInput(int key);
             void handleGameSelectionInput(int key);
             void handleGraphicsSelectionInput(int key);
+            void handleLeaderboardInput(int key);
             void renderMenu();
             void renderGameSelection();
             void renderGraphicsSelection();
+            void renderLeaderboard();
 
             void handleGameInput(int key);
             void renderGame();

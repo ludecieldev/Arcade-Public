@@ -14,12 +14,16 @@
 
 namespace arcd {
 
+// Variable globale pour suivre quelle option est sélectionnée dans la colonne Player
+int playerOptionSelected = 0;
+
 Core::Core(const std::string& initialGraphicsLib)
     : _state(AppState::MENU), 
       _selectedMenuOption(0), 
       _selectedSubMenuOption(0),
       _selectedGameIndex(0),
-      _selectedGraphicsIndex(0)
+      _selectedGraphicsIndex(0),
+      _selectedLeaderboardGame(0)
 {
     _libManager = std::make_unique<LibraryManager>("./lib");
     _scoreManager = std::make_unique<ScoreManager>();
@@ -56,6 +60,9 @@ bool Core::initialize()
     }
 
     try {
+        // Try to load saved scores
+        _scoreManager->loadScores("./scores.dat");
+        
         auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
         return graphicsLib.initialize();
     } catch (const std::exception& e) {
@@ -119,6 +126,9 @@ void Core::run()
                 case AppState::SELECT_GRAPHICS:
                     handleGraphicsSelectionInput(key);
                     break;
+                case AppState::LEADERBOARD:
+                    handleLeaderboardInput(key);
+                    break;
                 default:
                     break;
             }
@@ -158,6 +168,9 @@ void Core::run()
                 case AppState::SELECT_GRAPHICS:
                     renderGraphicsSelection();
                     break;
+                case AppState::LEADERBOARD:
+                    renderLeaderboard();
+                    break;
                 default:
                     break;
             }
@@ -195,6 +208,13 @@ void Core::run()
 }
 
 void Core::cleanup() {
+    // Save scores before exiting
+    try {
+        _scoreManager->saveScores("./scores.dat");
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving scores: " << e.what() << std::endl;
+    }
+    
     // First, cleanup the graphics library
     if (_libManager && _libManager->hasGraphicsLibrary()) {
         try {
@@ -222,7 +242,7 @@ void Core::initializeMenu() {
     _menuOptions = {
         "Select Game",
         "Select Graphics Library",
-        "Enter Name",
+        "Leaderboard",
         "Exit"
     };
     updateLibraryLists();
@@ -264,6 +284,13 @@ void Core::handleMenuInput(int key)
 {
     if (key == IGraphicsLibrary::KEY_ESC_CODE) {
         _state = AppState::EXIT;
+        return;
+    }
+    
+    // 'L' key for direct access to leaderboard
+    if (key == 'l' || key == 'L') {
+        _state = AppState::LEADERBOARD;
+        _selectedLeaderboardGame = 0; // Start with the first game
         return;
     }
     
@@ -320,14 +347,30 @@ void Core::handleMenuInput(int key)
             }
         }
     } else if (_selectedMenuOption == 2) { // Boîte du joueur
-        if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
-            if (_libManager->hasGraphicsLibrary()) {
-                try {
-                    auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
-                    graphicsLib.getPlayerName(_playerName);
-                } catch (...) {
-                    // Handle exception silently
+        if (key == IGraphicsLibrary::KEY_UP_CODE) {
+            playerOptionSelected = 0; // Sélectionner le nom du joueur
+        } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+            playerOptionSelected = 1; // Sélectionner le leaderboard
+        } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+            if (playerOptionSelected == 0) { // Option de changement de pseudo
+                if (_libManager->hasGraphicsLibrary()) {
+                    try {
+                        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+                        std::string oldName = _playerName;
+                        graphicsLib.getPlayerName(_playerName);
+                        
+                        // Afficher un message de confirmation si le nom a changé
+                        if (oldName != _playerName && !_playerName.empty()) {
+                            // On pourrait ajouter un message temporaire ici
+                            std::cout << "Nickname updated to: " << _playerName << std::endl;
+                        }
+                    } catch (...) {
+                        // Handle exception silently
+                    }
                 }
+            } else { // Option leaderboard
+                _state = AppState::LEADERBOARD;
+                _selectedLeaderboardGame = 0;
             }
         }
     }
@@ -395,6 +438,26 @@ void Core::handleGraphicsSelectionInput(int key)
     }
 }
 
+void Core::handleLeaderboardInput(int key)
+{
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
+        _state = AppState::MENU;
+        return;
+    }
+    
+    // Navigation between games
+    if (key == IGraphicsLibrary::KEY_LEFT_CODE) {
+        if (!_gameOptions.empty()) {
+            _selectedLeaderboardGame = (_selectedLeaderboardGame > 0) ? 
+                _selectedLeaderboardGame - 1 : static_cast<int>(_gameOptions.size()) - 1;
+        }
+    } else if (key == IGraphicsLibrary::KEY_RIGHT_CODE) {
+        if (!_gameOptions.empty()) {
+            _selectedLeaderboardGame = (_selectedLeaderboardGame + 1) % _gameOptions.size();
+        }
+    }
+}
+
 void Core::renderMenu() {
     if (!_libManager->hasGraphicsLibrary()) {
         return;
@@ -432,16 +495,48 @@ void Core::renderMenu() {
             _selectedGraphicsIndex = _graphicsOptions.empty() ? 0 : static_cast<int>(_graphicsOptions.size()) - 1;
         }
         
+        // Créer un titre pour le menu principal
+        std::string menuTitle = "ARCADE";
+        
+        // Personnaliser les options de la colonne Player
+        // Construire un vecteur d'options pour la colonne Player
+        std::vector<std::string> playerOptions;
+        playerOptions.push_back(playerOptionSelected == 0 ? "Nickname" : "  Nickname");
+        playerOptions.push_back(playerOptionSelected == 1 ? "Leaderboard" : "  Leaderboard");
+        
+        // Construire une seule chaîne avec saut de ligne pour l'affichage
+        std::string playerDisplay = playerOptions[0] + "\n" + playerOptions[1];
+        
         // Use the standardized menu drawing method
         graphicsLib.drawMenu(
-            "ARCADE",
+            menuTitle,
             gameNames,
             graphicsNames,
-            _playerName,
+            _playerName, // Utiliser le nom du joueur comme identifiant standard
             _selectedMenuOption,
             _selectedGameIndex,
             _selectedGraphicsIndex
         );
+        
+        // Afficher manuellement les options de la colonne Player
+        int width = graphicsLib.getWidth();
+        int height = graphicsLib.getHeight();
+        
+        // Position approximative de la colonne Player
+        int playerColX = width * 3 / 4;
+        int playerColY = height / 3;
+        
+        // Dessiner le titre de la colonne
+        std::string playerTitle = "Player: " + _playerName;
+        int playerTitleX = playerColX - playerTitle.length() / 2;
+        graphicsLib.drawText(playerTitleX, playerColY - 3, playerTitle, Color::CYAN);
+        
+        // Dessiner les options
+        for (size_t i = 0; i < playerOptions.size(); i++) {
+            graphicsLib.drawText(playerColX - 5, playerColY + i, playerOptions[i], 
+                              (i == (size_t)playerOptionSelected) ? Color::GREEN : Color::WHITE);
+        }
+        
     } catch (const std::exception& e) {
         std::cerr << "Error rendering menu: " << e.what() << std::endl;
     }
@@ -656,6 +751,115 @@ void Core::renderGraphicsSelection()
         }
     } catch (const std::exception& e) {
         std::cerr << "Error rendering graphics selection: " << e.what() << std::endl;
+    }
+}
+
+void Core::renderLeaderboard()
+{
+    if (!_libManager->hasGraphicsLibrary()) {
+        return;
+    }
+    
+    try {
+        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+        
+        // Calculate dimensions with safety margins
+        int width = std::max(40, graphicsLib.getWidth());
+        int height = std::max(20, graphicsLib.getHeight());
+        
+        // Draw leaderboard title
+        int titleWidth = std::min(40, width - 6);
+        int titleHeight = 3;
+        int startX = std::max(2, (width - titleWidth) / 2);
+        int startY = std::max(2, (height - titleHeight) / 2 - 6);
+        
+        graphicsLib.drawBox(startX, startY, titleWidth, titleHeight, Color::CYAN);
+        std::string title = "LEADERBOARD";
+        int titleX = startX + (titleWidth - static_cast<int>(title.length())) / 2;
+        graphicsLib.drawText(titleX, startY + 1, title, Color::CYAN);
+        
+        // Afficher le nom du joueur actuel
+        std::string playerInfo = "Player: " + _playerName;
+        int playerInfoX = startX + (titleWidth - static_cast<int>(playerInfo.length())) / 2;
+        graphicsLib.drawText(playerInfoX, startY + titleHeight + 1, playerInfo, Color::YELLOW);
+        
+        // Selected game name
+        std::string gameName = _gameOptions.empty() ? "No games available" : _gameOptions[_selectedLeaderboardGame];
+        
+        // Extract just the game name without the path/extension for display
+        std::string displayGameName = gameName;
+        size_t lastSlash = displayGameName.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            displayGameName = displayGameName.substr(lastSlash + 1);
+        }
+        size_t extensionPos = displayGameName.find_last_of('.');
+        if (extensionPos != std::string::npos) {
+            displayGameName = displayGameName.substr(0, extensionPos);
+        }
+        
+        std::string gameTitle = "Game: " + displayGameName;
+        int gameTitleX = startX + (titleWidth - static_cast<int>(gameTitle.length())) / 2;
+        graphicsLib.drawText(gameTitleX, startY + 4, gameTitle, Color::GREEN);
+        
+        // Draw scores
+        int scoreStartY = startY + 6;
+        int maxScores = height - scoreStartY - 4;
+        
+        if (!_gameOptions.empty()) {
+            // Get scores for the selected game
+            std::vector<Score> scores = _scoreManager->getScores(gameName);
+            
+            if (scores.empty()) {
+                std::string noScores = "No scores yet for this game";
+                int noScoresX = startX + (titleWidth - static_cast<int>(noScores.length())) / 2;
+                graphicsLib.drawText(noScoresX, scoreStartY + 2, noScores, Color::YELLOW);
+            } else {
+                // Draw header
+                graphicsLib.drawText(startX + 2, scoreStartY, "Player", Color::WHITE);
+                graphicsLib.drawText(startX + titleWidth - 10, scoreStartY, "Score", Color::WHITE);
+                
+                // Draw horizontal line
+                std::string line(titleWidth - 4, '-');
+                graphicsLib.drawText(startX + 2, scoreStartY + 1, line, Color::WHITE);
+                
+                // Draw scores
+                int displayCount = std::min(static_cast<int>(scores.size()), maxScores);
+                for (int i = 0; i < displayCount; i++) {
+                    // Player name
+                    std::string playerName = scores[i].playerName;
+                    if (playerName.length() > 15) {
+                        playerName = playerName.substr(0, 12) + "...";
+                    }
+                    
+                    // Utiliser une couleur différente pour mettre en évidence le joueur actuel
+                    Color nameColor = (scores[i].playerName == _playerName) ? Color::YELLOW : Color::GREEN;
+                    
+                    graphicsLib.drawText(startX + 2, scoreStartY + i + 2, playerName, nameColor);
+                    
+                    // Score
+                    std::string scoreText = std::to_string(scores[i].value);
+                    graphicsLib.drawText(startX + titleWidth - 5 - static_cast<int>(scoreText.length()), 
+                                      scoreStartY + i + 2, scoreText, nameColor);
+                }
+            }
+        } else {
+            std::string noGames = "No games available";
+            int noGamesX = startX + (titleWidth - static_cast<int>(noGames.length())) / 2;
+            graphicsLib.drawText(noGamesX, scoreStartY + 2, noGames, Color::RED);
+        }
+        
+        // Draw navigation help
+        std::string navigation = "<- Previous Game | Next Game ->";
+        int navX = startX + (titleWidth - static_cast<int>(navigation.length())) / 2;
+        graphicsLib.drawText(navX, height - 4, navigation, Color::CYAN);
+        
+        // Draw exit help
+        std::string exitHelp = "ESC: Back to Menu";
+        int exitX = startX + (titleWidth - static_cast<int>(exitHelp.length())) / 2;
+        graphicsLib.drawText(exitX, height - 2, exitHelp, Color::CYAN);
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error rendering leaderboard: " << e.what() << std::endl;
     }
 }
 

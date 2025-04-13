@@ -26,7 +26,11 @@ std::vector<Score> ScoreManager::getScores(const std::string& gameName) const
 {
     auto it = _scores.find(gameName);
     if (it != _scores.end()) {
-        return it->second;
+        auto scores = it->second;
+        // Sort scores in descending order in case the original ordering was lost
+        std::sort(scores.begin(), scores.end(), 
+                 [](const Score& a, const Score& b) { return a.value > b.value; });
+        return scores;
     }
     return {};
 }
