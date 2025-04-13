@@ -139,6 +139,11 @@ void SnakeGame::handleInput(int key)
     }
 }
 
+void SnakeGame::handleMouseInput(const IGraphicsLibrary::MouseEvent& event)
+{
+    (void)event;
+}
+
 void SnakeGame::render(IGraphicsLibrary& graphicsLib)
 {
     // Get the screen dimensions

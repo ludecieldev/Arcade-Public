@@ -40,6 +40,7 @@ public:
 
     // Input handling
     void handleInput(int key) override;
+    void handleMouseInput(const IGraphicsLibrary::MouseEvent& event) override;
 
     // Rendering
     void render(IGraphicsLibrary& graphicsLib) override;
