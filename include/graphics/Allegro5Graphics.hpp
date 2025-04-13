@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 
 namespace arcd {
 
@@ -172,22 +173,22 @@ private:
     /**
      * @brief Main Allegro display
      */
-    ALLEGRO_DISPLAY* _display;
+    std::unique_ptr<ALLEGRO_DISPLAY, void(*)(ALLEGRO_DISPLAY*)> _display;
 
     /**
      * @brief Allegro event queue
      */
-    ALLEGRO_EVENT_QUEUE* _eventQueue;
+    std::unique_ptr<ALLEGRO_EVENT_QUEUE, void(*)(ALLEGRO_EVENT_QUEUE*)> _eventQueue;
 
     /**
      * @brief Font for text rendering
      */
-    ALLEGRO_FONT* _font;
+    std::unique_ptr<ALLEGRO_FONT, void(*)(ALLEGRO_FONT*)> _font;
 
     /**
      * @brief Timer for frame rate control
      */
-    ALLEGRO_TIMER* _timer;
+    std::unique_ptr<ALLEGRO_TIMER, void(*)(ALLEGRO_TIMER*)> _timer;
 
     /**
      * @brief Flag indicating if window should close

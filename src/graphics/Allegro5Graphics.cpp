@@ -11,10 +11,10 @@ Allegro5Graphics::Allegro5Graphics()
     , _playerName("Player")
     , _lastKey(-1)
     , _frameCounter(0)
-    , _display(nullptr)
-    , _eventQueue(nullptr)
-    , _font(nullptr)
-    , _timer(nullptr)
+    , _display(nullptr, al_destroy_display)
+    , _eventQueue(nullptr, al_destroy_event_queue)
+    , _font(nullptr, al_destroy_font)
+    , _timer(nullptr, al_destroy_timer)
     , _shouldClose(false)
 {
 }
@@ -44,30 +44,30 @@ bool Allegro5Graphics::initialize() {
     al_set_keyboard_leds(0);
 
     // Créer la fenêtre
-    _display = al_create_display(_width, _height);
+    _display.reset(al_create_display(_width, _height));
     if (!_display) {
         std::cerr << "Failed to create display" << std::endl;
         return false;
     }
 
     // Créer la file d'événements
-    _eventQueue = al_create_event_queue();
+    _eventQueue.reset(al_create_event_queue());
     if (!_eventQueue) {
         std::cerr << "Failed to create event queue" << std::endl;
         return false;
     }
 
     // Créer le timer
-    _timer = al_create_timer(1.0 / 30.0);
+    _timer.reset(al_create_timer(1.0 / 30.0));
     if (!_timer) {
         std::cerr << "Failed to create timer" << std::endl;
         return false;
     }
 
     // Enregistrer les sources d'événements
-    al_register_event_source(_eventQueue, al_get_display_event_source(_display));
-    al_register_event_source(_eventQueue, al_get_keyboard_event_source());
-    al_register_event_source(_eventQueue, al_get_timer_event_source(_timer));
+    al_register_event_source(_eventQueue.get(), al_get_display_event_source(_display.get()));
+    al_register_event_source(_eventQueue.get(), al_get_keyboard_event_source());
+    al_register_event_source(_eventQueue.get(), al_get_timer_event_source(_timer.get()));
 
     // Charger la police
     std::string fontPath = "assets/fonts/Arial.ttf";
@@ -76,7 +76,7 @@ bool Allegro5Graphics::initialize() {
         return false;
     }
 
-    _font = al_load_ttf_font(fontPath.c_str(), 24, 0);
+    _font.reset(al_load_ttf_font(fontPath.c_str(), 24, 0));
     if (!_font) {
         std::cerr << "Failed to load font" << std::endl;
         return false;
@@ -86,7 +86,7 @@ bool Allegro5Graphics::initialize() {
     initColors();
 
     // Démarrer le timer
-    al_start_timer(_timer);
+    al_start_timer(_timer.get());
 
     _initialized = true;
     _shouldClose = false;
@@ -94,22 +94,10 @@ bool Allegro5Graphics::initialize() {
 }
 
 void Allegro5Graphics::cleanup() {
-    if (_timer) {
-        al_destroy_timer(_timer);
-        _timer = nullptr;
-    }
-    if (_eventQueue) {
-        al_destroy_event_queue(_eventQueue);
-        _eventQueue = nullptr;
-    }
-    if (_font) {
-        al_destroy_font(_font);
-        _font = nullptr;
-    }
-    if (_display) {
-        al_destroy_display(_display);
-        _display = nullptr;
-    }
+    _timer.reset();
+    _eventQueue.reset();
+    _font.reset();
+    _display.reset();
     _initialized = false;
 }
 
@@ -128,7 +116,7 @@ int Allegro5Graphics::getKey()
     if (!_initialized) return -1;
     
     ALLEGRO_EVENT event;
-    while (al_get_next_event(_eventQueue, &event)) {
+    while (al_get_next_event(_eventQueue.get(), &event)) {
         if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             _shouldClose = true;
             return KEY_ESC_CODE;
@@ -205,30 +193,29 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
     bool cursorVisible = true;
     
     // Créer un timer pour le clignotement du curseur
-    ALLEGRO_TIMER* cursorTimer = al_create_timer(0.5); // 500ms interval
+    std::unique_ptr<ALLEGRO_TIMER, void(*)(ALLEGRO_TIMER*)> cursorTimer(al_create_timer(0.5), al_destroy_timer); // 500ms interval
     if (!cursorTimer) {
         playerName = _playerName;
         return;
     }
     
     // Ajouter le timer à la file d'événements
-    ALLEGRO_EVENT_QUEUE* nameEventQueue = al_create_event_queue();
+    std::unique_ptr<ALLEGRO_EVENT_QUEUE, void(*)(ALLEGRO_EVENT_QUEUE*)> nameEventQueue(al_create_event_queue(), al_destroy_event_queue);
     if (!nameEventQueue) {
-        al_destroy_timer(cursorTimer);
         playerName = _playerName;
         return;
     }
     
-    al_register_event_source(nameEventQueue, al_get_keyboard_event_source());
-    al_register_event_source(nameEventQueue, al_get_timer_event_source(cursorTimer));
-    al_register_event_source(nameEventQueue, al_get_display_event_source(_display));
+    al_register_event_source(nameEventQueue.get(), al_get_keyboard_event_source());
+    al_register_event_source(nameEventQueue.get(), al_get_timer_event_source(cursorTimer.get()));
+    al_register_event_source(nameEventQueue.get(), al_get_display_event_source(_display.get()));
     
-    al_start_timer(cursorTimer);
+    al_start_timer(cursorTimer.get());
     
     // Créer une police plus grande pour l'édition du nom
-    ALLEGRO_FONT* nameFont = al_load_ttf_font("assets/fonts/Arial.ttf", 36, 0);
+    std::unique_ptr<ALLEGRO_FONT, void(*)(ALLEGRO_FONT*)> nameFont(al_load_ttf_font("assets/fonts/Arial.ttf", 36, 0), al_destroy_font);
     if (!nameFont) {
-        nameFont = _font; // Fallback to regular font
+        nameFont.reset(_font.get()); // Note: this doesn't take ownership
     }
     
     // Dessiner la boîte de dialogue et attendre la saisie
@@ -260,7 +247,7 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
             
             // Dessiner le titre
             al_draw_text(
-                nameFont, al_map_rgb(255, 255, 255),
+                nameFont.get(), al_map_rgb(255, 255, 255),
                 _width/2, _height/3 + 30,
                 ALLEGRO_ALIGN_CENTER, "Enter Player Name"
             );
@@ -272,14 +259,14 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
             }
             
             al_draw_text(
-                nameFont, al_map_rgb(255, 255, 0),
+                nameFont.get(), al_map_rgb(255, 255, 0),
                 _width/2, _height/2 - 18, // Centrer verticalement
                 ALLEGRO_ALIGN_CENTER, displayText.c_str()
             );
             
             // Dessiner les instructions
             al_draw_text(
-                _font, al_map_rgb(200, 200, 200),
+                _font.get(), al_map_rgb(200, 200, 200),
                 _width/2, _height*2/3 - 40,
                 ALLEGRO_ALIGN_CENTER, "Press ENTER to confirm, ESC to cancel"
             );
@@ -289,7 +276,7 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
         }
         
         // Vérifier si un événement est disponible
-        bool hasEvent = al_get_next_event(nameEventQueue, &event);
+        bool hasEvent = al_get_next_event(nameEventQueue.get(), &event);
         
         // Si pas d'événement, on continue
         if (!hasEvent) {
@@ -298,7 +285,7 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
         
         if (event.type == ALLEGRO_EVENT_TIMER) {
             // Le timer du curseur a déclenché
-            if (event.timer.source == cursorTimer) {
+            if (event.timer.source == cursorTimer.get()) {
                 cursorVisible = !cursorVisible;
                 redraw = true;
             }
@@ -340,13 +327,7 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
     }
     
     // Nettoyer les ressources
-    al_stop_timer(cursorTimer);
-    al_destroy_timer(cursorTimer);
-    al_destroy_event_queue(nameEventQueue);
-    
-    if (nameFont && nameFont != _font) {
-        al_destroy_font(nameFont);
-    }
+    al_stop_timer(cursorTimer.get());
     
     // Mettre à jour le nom du joueur dans la référence passée
     playerName = _playerName;
@@ -354,7 +335,7 @@ void Allegro5Graphics::getPlayerName(std::string& playerName) {
     // Vider la file d'événements principale pour éviter que la touche ENTER
     // ne soit immédiatement traitée dans le menu principal
     ALLEGRO_EVENT flushEvent;
-    while (al_get_next_event(_eventQueue, &flushEvent)) {
+    while (al_get_next_event(_eventQueue.get(), &flushEvent)) {
         // Ignorer tous les événements
     }
     
@@ -378,7 +359,7 @@ void Allegro5Graphics::drawText(int x, int y, const std::string& text, Color col
     if (!_initialized || !_font) return;
     
     // Calculer la hauteur de la ligne pour l'espacement
-    int lineHeight = al_get_font_line_height(_font);
+    int lineHeight = al_get_font_line_height(_font.get());
     
     // Diviser le texte en lignes
     std::string line;
@@ -389,11 +370,11 @@ void Allegro5Graphics::drawText(int x, int y, const std::string& text, Color col
         size_t newline = text.find('\n', pos);
         if (newline == std::string::npos) {
             line = text.substr(pos);
-            al_draw_text(_font, _colors[color], x, currentY, ALLEGRO_ALIGN_LEFT, line.c_str());
+            al_draw_text(_font.get(), _colors[color], x, currentY, ALLEGRO_ALIGN_LEFT, line.c_str());
             break;
         } else {
             line = text.substr(pos, newline - pos);
-            al_draw_text(_font, _colors[color], x, currentY, ALLEGRO_ALIGN_LEFT, line.c_str());
+            al_draw_text(_font.get(), _colors[color], x, currentY, ALLEGRO_ALIGN_LEFT, line.c_str());
             currentY += lineHeight + 10; // Ajout d'espacement supplémentaire ici
             pos = newline + 1;
         }
@@ -408,10 +389,10 @@ void Allegro5Graphics::drawBox(int x, int y, int width, int height, Color color)
 void Allegro5Graphics::drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color) {
     if (!_initialized || !_font) return;
     
-    int lineHeight = al_get_font_line_height(_font) + 10; // Ajouter 10 pixels d'espacement
+    int lineHeight = al_get_font_line_height(_font.get()) + 10; // Ajouter 10 pixels d'espacement
     for (size_t i = 0; i < items.size(); ++i) {
         Color itemColor = (static_cast<int>(i) == selectedIndex) ? Color::YELLOW : color;
-        al_draw_text(_font, _colors[itemColor], x, y + (i * lineHeight), ALLEGRO_ALIGN_LEFT, items[i].c_str());
+        al_draw_text(_font.get(), _colors[itemColor], x, y + (i * lineHeight), ALLEGRO_ALIGN_LEFT, items[i].c_str());
     }
 }
 
@@ -429,8 +410,8 @@ void Allegro5Graphics::initColors() {
 
 void Allegro5Graphics::updateWindowSize() {
     if (_initialized) {
-        _width = al_get_display_width(_display);
-        _height = al_get_display_height(_display);
+        _width = al_get_display_width(_display.get());
+        _height = al_get_display_height(_display.get());
     }
 }
 
@@ -439,7 +420,7 @@ void Allegro5Graphics::drawTestScreen() {
     clear();
     
     // Titre centré
-    int titleWidth = al_get_text_width(_font, "ARCADE");
+    int titleWidth = al_get_text_width(_font.get(), "ARCADE");
     drawText(_width / 2 - titleWidth / 2, 50, "ARCADE", Color::WHITE);
     
     // Boîtes de menu avec espacement
@@ -450,9 +431,9 @@ void Allegro5Graphics::drawTestScreen() {
     // Instructions avec espacement
     int instructionY = 420; // Ajustement de la position de départ
     drawText(100, instructionY, "Use TAB to switch between boxes", Color::WHITE);
-    instructionY += al_get_font_line_height(_font) + 10;
+    instructionY += al_get_font_line_height(_font.get()) + 10;
     drawText(100, instructionY, "Use ARROWS to navigate", Color::WHITE);
-    instructionY += al_get_font_line_height(_font) + 10;
+    instructionY += al_get_font_line_height(_font.get()) + 10;
     drawText(100, instructionY, "Press ENTER to select", Color::WHITE);
     
     refresh();
@@ -467,7 +448,7 @@ void Allegro5Graphics::drawMenuBox(const std::string& title, const std::vector<s
     
     // Items avec espacement
     int itemY = y + 60; // Ajustement de la position du premier item
-    int lineSpacing = al_get_font_line_height(_font) + 10; // Augmentation de l'espacement
+    int lineSpacing = al_get_font_line_height(_font.get()) + 10; // Augmentation de l'espacement
     for (const auto& item : items) {
         drawText(x + 10, itemY, item, boxColor);
         itemY += lineSpacing;
@@ -489,14 +470,13 @@ void Allegro5Graphics::drawMenu(
     clear();
     
     // Titre centré avec grande taille
-    ALLEGRO_FONT* titleFont = al_load_ttf_font("assets/fonts/Arial.ttf", 36, 0);
+    std::unique_ptr<ALLEGRO_FONT, void(*)(ALLEGRO_FONT*)> titleFont(al_load_ttf_font("assets/fonts/Arial.ttf", 36, 0), al_destroy_font);
     if (titleFont) {
         // Utiliser le retour du centre de l'alignement pour le texte
-        al_draw_text(titleFont, _colors[Color::WHITE], _width / 2, 50, ALLEGRO_ALIGN_CENTER, title.c_str());
-        al_destroy_font(titleFont);
+        al_draw_text(titleFont.get(), _colors[Color::WHITE], _width / 2, 50, ALLEGRO_ALIGN_CENTER, title.c_str());
     } else {
         // Fallback si la police de titre ne peut pas être chargée
-        int titleWidth = al_get_text_width(_font, title.c_str());
+        int titleWidth = al_get_text_width(_font.get(), title.c_str());
         drawText(_width / 2 - titleWidth / 2, 50, title, Color::WHITE);
     }
     
@@ -552,7 +532,7 @@ void Allegro5Graphics::drawMenu(
     drawBox(startX, boxesY, boxWidth, boxHeight, isGameSelected ? Color::YELLOW : Color::WHITE);
     drawText(startX + 10, boxesY + 20, "Games", isGameSelected ? Color::YELLOW : Color::WHITE);
     int itemY = boxesY + 60;
-    int lineSpacing = al_get_font_line_height(_font) + 15; // Espacement augmenté
+    int lineSpacing = al_get_font_line_height(_font.get()) + 15; // Espacement augmenté
     for (size_t i = 0; i < displayGameNames.size(); i++) {
         Color itemColor = (isGameSelected && static_cast<int>(i) == selectedGameIndex) ? Color::YELLOW : Color::WHITE;
         drawText(startX + 20, itemY, displayGameNames[i], itemColor);
