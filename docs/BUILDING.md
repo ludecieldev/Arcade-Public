@@ -60,8 +60,7 @@ sudo pacman -S ncurses
 sudo pacman -S sdl2 sdl2_ttf sdl2_image
 
 # Allegro5
-sudo pacman -S allegro5 allegro-ttf5 allegro-primitives5
-```
+sudo pacman -S allegro
 
 ## Building the Project
 
