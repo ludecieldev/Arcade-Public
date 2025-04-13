@@ -18,8 +18,10 @@ CORE_OBJ = $(CORE_SRC:.cpp=.o)
 CORE_NAME = arcade
 
 # Game sources
-GAME_SRC = src/games/SnakeGame.cpp
-GAME_LIBS = lib/arcade_snake.so
+GAME_SRC = src/games/SnakeGame.cpp \
+		   src/games/Minesweeper.cpp
+
+GAME_LIBS = lib/arcade_snake.so lib/arcade_minesweeper.so
 
 # Graphicals sources
 GRAPHICALS_SRC = src/graphics/NcursesGraphics.cpp
@@ -32,7 +34,7 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC -fno-gnu-unique
 LDFLAGS = -lallegro -lallegro_font -lallegro_ttf -lallegro_primitives -lncurses -lSDL2 -lSDL2_ttf
 
 # Debug flags
-DEBUG_FLAGS = -g3
+DEBUG_FLAGS = -g3S
 
 # Colors for output
 CYAN = \033[0;36m
@@ -55,6 +57,11 @@ $(CORE_NAME): $(CORE_OBJ)
 games: $(GAME_LIBS)
 
 lib/arcade_snake.so: src/games/SnakeGame.cpp
+	@mkdir -p lib
+	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+	@echo -e "${GREEN}Game library built: $@${NC}"
+
+lib/arcade_minesweeper.so: src/games/Minesweeper.cpp
 	@mkdir -p lib
 	@$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
 	@echo -e "${GREEN}Game library built: $@${NC}"
