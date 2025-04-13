@@ -51,8 +51,8 @@ bool SDL2Graphics::initialize()
         return false;
     }
 
-    _window = SDL_CreateWindow("Arcade", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                             1024, 768, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    _window.reset(SDL_CreateWindow("Arcade", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                             1024, 768, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE));
     if (!_window) {
         std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << std::endl;
         TTF_Quit();
@@ -60,10 +60,10 @@ bool SDL2Graphics::initialize()
         return false;
     }
 
-    _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
+    _renderer.reset(SDL_CreateRenderer(_window.get(), -1, SDL_RENDERER_ACCELERATED));
     if (!_renderer) {
         std::cerr << "SDL_CreateRenderer failed: " << SDL_GetError() << std::endl;
-        SDL_DestroyWindow(_window);
+        _window.reset();
         TTF_Quit();
         SDL_Quit();
         return false;
@@ -74,19 +74,19 @@ bool SDL2Graphics::initialize()
     if (!std::filesystem::exists(fontPath)) {
         std::cerr << "Error: Font file not found: " << fontPath << std::endl;
         std::cerr << "SDL2 Graphics library cannot start without this font." << std::endl;
-        SDL_DestroyRenderer(_renderer);
-        SDL_DestroyWindow(_window);
+        _renderer.reset();
+        _window.reset();
         TTF_Quit();
         SDL_Quit();
         exit(84);
     }
     
-    _font = TTF_OpenFont(fontPath.c_str(), 16);
+    _font.reset(TTF_OpenFont(fontPath.c_str(), 16));
     if (!_font) {
         std::cerr << "Error: Failed to load font: " << fontPath << std::endl;
         std::cerr << "SDL2 Graphics library cannot start without this font." << std::endl;
-        SDL_DestroyRenderer(_renderer);
-        SDL_DestroyWindow(_window);
+        _renderer.reset();
+        _window.reset();
         TTF_Quit();
         SDL_Quit();
         exit(84);
@@ -105,18 +105,9 @@ bool SDL2Graphics::initialize()
  */
 void SDL2Graphics::cleanup()
 {
-    if (_font) {
-        TTF_CloseFont(_font);
-        _font = nullptr;
-    }
-    if (_renderer) {
-        SDL_DestroyRenderer(_renderer);
-        _renderer = nullptr;
-    }
-    if (_window) {
-        SDL_DestroyWindow(_window);
-        _window = nullptr;
-    }
+    _font.reset();
+    _renderer.reset();
+    _window.reset();
     TTF_Quit();
     SDL_Quit();
     _initialized = false;
@@ -129,8 +120,8 @@ void SDL2Graphics::clear()
 {
     if (!_initialized)
         return;
-    SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-    SDL_RenderClear(_renderer);
+    SDL_SetRenderDrawColor(_renderer.get(), 0, 0, 0, 255);
+    SDL_RenderClear(_renderer.get());
 }
 
 /**
@@ -142,7 +133,7 @@ void SDL2Graphics::refresh()
 {
     if (!_initialized)
         return;
-    SDL_RenderPresent(_renderer);
+    SDL_RenderPresent(_renderer.get());
     _frameCounter++;
 }
 
@@ -179,16 +170,13 @@ void SDL2Graphics::drawText(int x, int y, const std::string& text, Color color)
     if (!_initialized || !_font)
         return;
 
-    SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_Surface* surface = TTF_RenderText_Blended(_font, text.c_str(), sdlColor);
+    auto surface = createTextSurface(text, color);
     if (!surface)
         return;
 
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(_renderer, surface);
-    if (!texture) {
-        SDL_FreeSurface(surface);
+    auto texture = createTextureFromSurface(surface.get());
+    if (!texture)
         return;
-    }
 
     SDL_Rect dest;
     dest.x = x * 10;
@@ -196,10 +184,7 @@ void SDL2Graphics::drawText(int x, int y, const std::string& text, Color color)
     dest.w = surface->w;
     dest.h = surface->h;
 
-    SDL_RenderCopy(_renderer, texture, nullptr, &dest);
-
-    SDL_DestroyTexture(texture);
-    SDL_FreeSurface(surface);
+    SDL_RenderCopy(_renderer.get(), texture.get(), nullptr, &dest);
 }
 
 /**
@@ -220,7 +205,7 @@ void SDL2Graphics::drawBox(int x, int y, int width, int height, Color color)
         return;
 
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_SetRenderDrawColor(_renderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
+    SDL_SetRenderDrawColor(_renderer.get(), sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
 
     SDL_Rect rect;
     rect.x = x * 10;
@@ -228,7 +213,7 @@ void SDL2Graphics::drawBox(int x, int y, int width, int height, Color color)
     rect.w = width * 10;
     rect.h = height * 20;
 
-    SDL_RenderDrawRect(_renderer, &rect);
+    SDL_RenderDrawRect(_renderer.get(), &rect);
 }
 
 /**
@@ -466,14 +451,14 @@ void SDL2Graphics::drawMenu(
     
     const int instructionBoxHeight = 180;
 
-    SDL_SetRenderDrawColor(_renderer, 50, 50, 50, 150);
+    SDL_SetRenderDrawColor(_renderer.get(), 50, 50, 50, 150);
     SDL_Rect instructionBox = {
         static_cast<int>((startX - 2) * 10), 
         static_cast<int>(instructionY * 20 - 10),
         static_cast<int>((totalWidth + 4) * 10), 
         instructionBoxHeight
     };
-    SDL_RenderFillRect(_renderer, &instructionBox);
+    SDL_RenderFillRect(_renderer.get(), &instructionBox);
     
     std::vector<std::pair<std::string, std::string>> instructions = {
         {"SELECT", "Use TAB to switch boxes"},
@@ -510,30 +495,24 @@ void SDL2Graphics::drawTextCentered(int y, const std::string& text, Color color)
     if (!_initialized || !_font)
         return;
 
-    SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_Surface* surface = TTF_RenderText_Blended(_font, text.c_str(), sdlColor);
+    auto surface = createTextSurface(text, color);
     if (!surface)
         return;
 
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(_renderer, surface);
-    if (!texture) {
-        SDL_FreeSurface(surface);
+    auto texture = createTextureFromSurface(surface.get());
+    if (!texture)
         return;
-    }
 
     SDL_Rect dest;
     int screen_width;
-    SDL_GetRendererOutputSize(_renderer, &screen_width, nullptr);
+    SDL_GetRendererOutputSize(_renderer.get(), &screen_width, nullptr);
     
     dest.x = (screen_width - surface->w) / 2;
     dest.y = y * 20;
     dest.w = surface->w;
     dest.h = surface->h;
 
-    SDL_RenderCopy(_renderer, texture, nullptr, &dest);
-
-    SDL_DestroyTexture(texture);
-    SDL_FreeSurface(surface);
+    SDL_RenderCopy(_renderer.get(), texture.get(), nullptr, &dest);
 }
 
 /**
@@ -558,22 +537,21 @@ void SDL2Graphics::drawBoxWithTitle(int x, int y, int width, int height, const s
     drawBox(x, y, width, height, color);
     
     if (_font && !title.empty()) {
-        SDL_Color sdlColor = _colors[static_cast<int>(color)];
-        SDL_Surface* surface = TTF_RenderText_Blended(_font, title.c_str(), sdlColor);
-        if (surface) {
-            SDL_Texture* texture = SDL_CreateTextureFromSurface(_renderer, surface);
-            if (texture) {
-                SDL_Rect dest;
-                dest.x = (x * 10) + ((width * 10) - surface->w) / 2;
-                dest.y = (y * 20) + 10;
-                dest.w = surface->w;
-                dest.h = surface->h;
-                
-                SDL_RenderCopy(_renderer, texture, nullptr, &dest);
-                SDL_DestroyTexture(texture);
-            }
-            SDL_FreeSurface(surface);
-        }
+        auto surface = createTextSurface(title, color);
+        if (!surface)
+            return;
+            
+        auto texture = createTextureFromSurface(surface.get());
+        if (!texture)
+            return;
+            
+        SDL_Rect dest;
+        dest.x = (x * 10) + ((width * 10) - surface->w) / 2;
+        dest.y = (y * 20) + 10;
+        dest.w = surface->w;
+        dest.h = surface->h;
+        
+        SDL_RenderCopy(_renderer.get(), texture.get(), nullptr, &dest);
     }
 }
 
@@ -596,7 +574,7 @@ void SDL2Graphics::drawFilledBox(int x, int y, int width, int height, [[maybe_un
         return;
 
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_SetRenderDrawColor(_renderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
+    SDL_SetRenderDrawColor(_renderer.get(), sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
 
     SDL_Rect rect;
     rect.x = x * 10;
@@ -604,7 +582,7 @@ void SDL2Graphics::drawFilledBox(int x, int y, int width, int height, [[maybe_un
     rect.w = width * 10;
     rect.h = height * 20;
 
-    SDL_RenderFillRect(_renderer, &rect);
+    SDL_RenderFillRect(_renderer.get(), &rect);
 }
 
 /**
@@ -623,9 +601,9 @@ void SDL2Graphics::drawHorizontalLine(int x, int y, int width, Color color)
         return;
 
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_SetRenderDrawColor(_renderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
+    SDL_SetRenderDrawColor(_renderer.get(), sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
     
-    SDL_RenderDrawLine(_renderer, x * 10, y * 20, (x + width) * 10, y * 20);
+    SDL_RenderDrawLine(_renderer.get(), x * 10, y * 20, (x + width) * 10, y * 20);
 }
 
 /**
@@ -644,9 +622,9 @@ void SDL2Graphics::drawVerticalLine(int x, int y, int height, Color color)
         return;
 
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_SetRenderDrawColor(_renderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
+    SDL_SetRenderDrawColor(_renderer.get(), sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
     
-    SDL_RenderDrawLine(_renderer, x * 10, y * 20, x * 10, (y + height) * 20);
+    SDL_RenderDrawLine(_renderer.get(), x * 10, y * 20, x * 10, (y + height) * 20);
 }
 
 /**
@@ -674,7 +652,7 @@ void SDL2Graphics::drawProgressBar(int x, int y, int width, int value, int maxVa
     if (fillWidth > width - 2) fillWidth = width - 2;
     
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_SetRenderDrawColor(_renderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
+    SDL_SetRenderDrawColor(_renderer.get(), sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
     
     SDL_Rect fillRect;
     fillRect.x = (x + 1) * 10;
@@ -682,7 +660,7 @@ void SDL2Graphics::drawProgressBar(int x, int y, int width, int value, int maxVa
     fillRect.w = fillWidth * 10;
     fillRect.h = 16;
     
-    SDL_RenderFillRect(_renderer, &fillRect);
+    SDL_RenderFillRect(_renderer.get(), &fillRect);
 }
 
 /**
@@ -702,16 +680,13 @@ void SDL2Graphics::drawBoldText(int x, int y, const std::string& text, Color col
     if (!_initialized || !_font)
         return;
 
-    SDL_Color sdlColor = _colors[static_cast<int>(color)];
-    SDL_Surface* surface = TTF_RenderText_Blended(_font, text.c_str(), sdlColor);
+    auto surface = createTextSurface(text, color);
     if (!surface)
         return;
 
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(_renderer, surface);
-    if (!texture) {
-        SDL_FreeSurface(surface);
+    auto texture = createTextureFromSurface(surface.get());
+    if (!texture)
         return;
-    }
 
     SDL_Rect dest;
     dest.x = x * 10;
@@ -719,10 +694,30 @@ void SDL2Graphics::drawBoldText(int x, int y, const std::string& text, Color col
     dest.w = surface->w;
     dest.h = surface->h;
 
-    SDL_RenderCopy(_renderer, texture, nullptr, &dest);
+    SDL_RenderCopy(_renderer.get(), texture.get(), nullptr, &dest);
+}
 
-    SDL_DestroyTexture(texture);
-    SDL_FreeSurface(surface);
+std::unique_ptr<SDL_Surface, SDL2Graphics::SDLDeleter> 
+SDL2Graphics::createTextSurface(const std::string& text, Color color)
+{
+    if (!_initialized || !_font || text.empty())
+        return nullptr;
+
+    SDL_Color sdlColor = _colors[static_cast<int>(color)];
+    return std::unique_ptr<SDL_Surface, SDLDeleter>(
+        TTF_RenderText_Blended(_font.get(), text.c_str(), sdlColor)
+    );
+}
+
+std::unique_ptr<SDL_Texture, SDL2Graphics::SDLDeleter>
+SDL2Graphics::createTextureFromSurface(SDL_Surface* surface)
+{
+    if (!_initialized || !_renderer || !surface)
+        return nullptr;
+
+    return std::unique_ptr<SDL_Texture, SDLDeleter>(
+        SDL_CreateTextureFromSurface(_renderer.get(), surface)
+    );
 }
 
 } // namespace arcd
@@ -732,4 +727,4 @@ extern "C" {
     {
         return std::make_unique<arcd::SDL2Graphics>();
     }
-} 
+}
