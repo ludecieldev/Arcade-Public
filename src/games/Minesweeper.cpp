@@ -195,7 +195,7 @@ void MinesweeperGame::render(IGraphicsLibrary& graphics)
             graphics.drawText(startX, startY + _rows * cellHeight + 1, "Game Over! Press R to restart", Color::RED);
         }
     } else {
-        graphics.drawText(startX, startY + _rows * cellHeight + 1, "SPACE: Reveal, F: Flag, ESC: Exit", Color::WHITE);
+        graphics.drawText(startX, startY + _rows * cellHeight + 1, "SPACE: Reveal, F: Flag, ESC: Exit, L: Switch graphics, R: Restart game", Color::WHITE);
     }
 
     graphics.refresh();
