@@ -23,7 +23,8 @@ Core::Core(const std::string& initialGraphicsLib)
       _selectedSubMenuOption(0),
       _selectedGameIndex(0),
       _selectedGraphicsIndex(0),
-      _selectedLeaderboardGame(0)
+      _selectedLeaderboardGame(0),
+      _isGameOverDisplayed(false)
 {
     _libManager = std::make_unique<LibraryManager>("./lib");
     _scoreManager = std::make_unique<ScoreManager>();
@@ -517,11 +518,47 @@ void Core::handleGameInput(int key)
 {
     if (!_libManager->hasGameLibrary()) {
         _state = AppState::MENU;
+        _isGameOverDisplayed = false;
         return;
     }
 
     try {
         auto& game = _libManager->getCurrentGameLibrary();
+        
+        // Si le jeu est en game over, ne gérer que certaines touches
+        if (game.isGameOver()) {
+            switch (key) {
+                case 'r':
+                case 'R':
+                    // Redémarrer le jeu
+                    game.restart();
+                    _isGameOverDisplayed = false;
+                    break;
+                case IGraphicsLibrary::KEY_ESC_CODE:
+                case 'm':
+                case 'M':
+                    // Retourner au menu
+                    _state = AppState::MENU;
+                    _isGameOverDisplayed = false;
+                    break;
+                case 'e':
+                case 'E':
+                    // Quitter complètement
+                    _state = AppState::EXIT;
+                    break;
+                case 'l':
+                case 'L':
+                    // Changer de bibliothèque graphique
+                    _libManager->loadNextGraphicsLibrary();
+                    break;
+                default:
+                    // Ignorer les autres touches en mode game over
+                    break;
+            }
+            return;
+        }
+        
+        // Si le jeu n'est pas en game over, gestion normale des entrées
         
         // First, pass all arrow key inputs to the game
         if (key == IGraphicsLibrary::KEY_LEFT_CODE || 
@@ -544,21 +581,25 @@ void Core::handleGameInput(int key)
                     if (_libManager->hasGameLibrary()) {
                         // Initialize GameManager with the loaded game from LibraryManager
                         _gameManager->initializeFromLibraryManager(*_libManager);
+                        _isGameOverDisplayed = false;
                     }
                 }
                 break;
             case IGraphicsLibrary::KEY_ESC_CODE:
                 _state = AppState::MENU;
+                _isGameOverDisplayed = false;
                 break;
             case 'r':
             case 'R':
                 game.restart();
+                _isGameOverDisplayed = false;
                 break;
             case 'q':
             case 'Q':
             case 'm':
             case 'M':
                 _state = AppState::MENU;
+                _isGameOverDisplayed = false;
                 break;
             case 'e':
             case 'E':
@@ -587,15 +628,17 @@ void Core::renderGame() {
         // we'll render the game directly from the LibraryManager
         if (_libManager->hasGameLibrary()) {
             auto& game = _libManager->getCurrentGameLibrary();
+            
+            // Toujours afficher le jeu, même en game over
             game.render(graphicsLib);
             
-            // Check if game is over
+            // Vérifier si le jeu est terminé
             if (game.isGameOver()) {
-                // Add score
-                _scoreManager->addScore(_playerName, game.getName(), game.getScore());
-                
-                // Return to menu
-                _state = AppState::MENU;
+                // Si c'est la première fois qu'on détecte le game over, ajouter le score
+                if (!_isGameOverDisplayed) {
+                    _scoreManager->addScore(_playerName, game.getName(), game.getScore());
+                    _isGameOverDisplayed = true;
+                }
             }
         } else {
             // No game loaded, return to menu

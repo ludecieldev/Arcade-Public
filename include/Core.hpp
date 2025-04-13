@@ -20,12 +20,12 @@ namespace arcd {
      * @brief Enumeration of possible application states
      */
     enum class AppState {
-        MENU,           
-        GAME,           
-        SELECT_GAME,    
-        SELECT_GRAPHICS, 
-        LEADERBOARD,    
-        EXIT            
+        MENU,
+        GAME,
+        SELECT_GAME,
+        SELECT_GRAPHICS,
+        LEADERBOARD,
+        EXIT
     };
 
     /**
@@ -37,22 +37,22 @@ namespace arcd {
              * @brief Manager for library loading and handling
              */
             std::unique_ptr<LibraryManager> _libManager;
-            
+
             /**
              * @brief Manager for score tracking
              */
             std::unique_ptr<ScoreManager> _scoreManager;
-            
+
             /**
              * @brief Manager for game operations
              */
             std::unique_ptr<GameManager> _gameManager;
-            
+
             /**
              * @brief Current application state
              */
             AppState _state;
-            
+
             /**
              * @brief Current player name
              */
@@ -62,47 +62,52 @@ namespace arcd {
              * @brief Selected option in the main menu
              */
             int _selectedMenuOption;
-            
+
             /**
              * @brief Selected option in the sub-menu
              */
             int _selectedSubMenuOption;
-            
+
             /**
              * @brief Index of selected game
              */
             int _selectedGameIndex;
-            
+
             /**
              * @brief Index of selected graphics library
              */
             int _selectedGraphicsIndex;
-            
+
             /**
              * @brief Index of selected game for leaderboard display
              */
             int _selectedLeaderboardGame;
-            
+
+            /**
+             * @brief Indique si l'écran Game Over doit être affiché
+             */
+            bool _isGameOverDisplayed;
+
             /**
              * @brief List of main menu options
              */
             std::vector<std::string> _menuOptions;
-            
+
             /**
              * @brief List of available games
              */
             std::vector<std::string> _gameOptions;
-            
+
             /**
              * @brief List of available graphics libraries
              */
             std::vector<std::string> _graphicsOptions;
-            
+
             /**
              * @brief Initialize the menu options
              */
             void initializeMenu();
-            
+
             /**
              * @brief Update the lists of available libraries
              */
@@ -113,25 +118,25 @@ namespace arcd {
              * @param key key code of pressed key
              */
             void handleMenuInput(int key);
-            
+
             /**
              * @brief Handle input in the game selection state
              * @param key key code of pressed key
              */
             void handleGameSelectionInput(int key);
-            
+
             /**
              * @brief Handle input in the graphics selection state
              * @param key key code of pressed key
              */
             void handleGraphicsSelectionInput(int key);
-            
+
             /**
              * @brief Handle input in the leaderboard state
              * @param key key code of pressed key
              */
             void handleLeaderboardInput(int key);
-            
+
             /**
              * @brief Render the main menu
              */
