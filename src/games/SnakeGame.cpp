@@ -1,228 +1,312 @@
 #include "games/SnakeGame.hpp"
-#include "interfaces/IEvent.hpp"
-#include "utils/KeyCodes.hpp"
-#include <random>
-#include <chrono>
+#include "interfaces/IGraphicsLibrary.hpp"
 #include <algorithm>
-#include <iostream>
 
 namespace arcd {
 
-using namespace arcd;  // To access IGraphicsLibrary constants
-
 SnakeGame::SnakeGame()
-    : _direction(Direction::RIGHT)
-    , _nextDirection(Direction::RIGHT)
-    , _gameOver(false)
+    : _gameOver(false)
     , _score(0)
-    , _updateAccumulator(0.0)
+    , _direction(Direction::RIGHT)
+    , _nextDirection(Direction::RIGHT)
     , _rng(std::random_device{}())
 {
+    _lastUpdateTime = std::chrono::high_resolution_clock::now();
     initialize();
 }
 
 void SnakeGame::initialize()
 {
-    // Initialize snake in the middle of the board
-    _snake.clear();
-    int startX = BOARD_WIDTH / 2;
-    int startY = BOARD_HEIGHT / 2;
-    
-    for (int i = 0; i < INITIAL_SNAKE_LENGTH; ++i) {
-        _snake.push_front({startX - i, startY});
-    }
-    
-    _direction = Direction::RIGHT;
-    _nextDirection = Direction::RIGHT;
+    // Reset game state
     _gameOver = false;
     _score = 0;
-    _updateAccumulator = 0.0;
+    _direction = Direction::RIGHT;
+    _nextDirection = Direction::RIGHT;
+    _snake.clear();
     
+    // Create initial snake in the middle of the board
+    int startX = BOARD_WIDTH / 2 - INITIAL_SNAKE_LENGTH;
+    int startY = BOARD_HEIGHT / 2;
+    
+    // Create the snake extending to the left (since we'll move right)
+    for (int i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
+        _snake.push_front({startX + i, startY}); // Snake starts moving right
+    }
+    
+    // Spawn initial food
     spawnFood();
     
-    // Clear game state cache so it will be regenerated
-    _gameState.reset();
+    // Reset timer
+    _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
-void SnakeGame::update(double deltaTime)
+void SnakeGame::update()
 {
-    if (_gameOver) return;
+    if (_gameOver) {
+        return;
+    }
     
-    _updateAccumulator += deltaTime;
+    // Check if enough time has passed since the last update
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        currentTime - _lastUpdateTime).count();
     
-    if (_updateAccumulator < UPDATE_INTERVAL) return;
+    if (elapsedTime < UPDATE_INTERVAL_MS) {
+        return; // Not time to update yet
+    }
     
-    _updateAccumulator -= UPDATE_INTERVAL;
+    // Update the direction
     _direction = _nextDirection;
+    
+    // Move the snake
     moveSnake();
     
-    // Check if snake ate food
-    if (_snake.front() == _food) {
+    // Check for food collision
+    if (_snake.front().x == _food.x && _snake.front().y == _food.y) {
+        // Don't remove the tail segment, effectively growing the snake
         _score += 10;
         spawnFood();
     } else {
+        // Remove the tail segment to maintain the same length
         _snake.pop_back();
     }
     
-    // Check for collisions
+    // Check for collisions with walls and self
     if (checkCollision(_snake.front())) {
         _gameOver = true;
     }
     
-    // Clear game state cache so it will be regenerated
-    _gameState.reset();
+    // Reset timer
+    _lastUpdateTime = currentTime;
+}
+
+void SnakeGame::handleInput(int key)
+{
+    // Handle restart when game is over
+    if (_gameOver) {
+        if (key == 'r' || key == 'R') {
+            restart();
+        }
+        return; // Don't handle other inputs when game is over
+    }
+    
+    // Only allow 90-degree turns to prevent immediate self-collision
+    switch (key) {
+        case IGraphicsLibrary::KEY_UP_CODE:
+            if (_direction != Direction::DOWN) {
+                _nextDirection = Direction::UP;
+            }
+            break;
+        case IGraphicsLibrary::KEY_DOWN_CODE:
+            if (_direction != Direction::UP) {
+                _nextDirection = Direction::DOWN;
+            }
+            break;
+        case IGraphicsLibrary::KEY_LEFT_CODE:
+            if (_direction != Direction::RIGHT) {
+                _nextDirection = Direction::LEFT;
+            }
+            break;
+        case IGraphicsLibrary::KEY_RIGHT_CODE:
+            if (_direction != Direction::LEFT) {
+                _nextDirection = Direction::RIGHT;
+            }
+            break;
+    }
+}
+
+void SnakeGame::render(IGraphicsLibrary& graphicsLib)
+{
+    // Get the screen dimensions
+    int screenWidth = graphicsLib.getWidth();
+    int screenHeight = graphicsLib.getHeight();
+    
+    // Determine cell size based on the graphics library window size
+    // For smaller windows, use smaller cells
+    int cellWidth = 2;
+    int cellHeight = 1;
+    
+    if (screenWidth < 80) { // For very small displays
+        cellWidth = 1;
+    }
+    
+    // Calculate position to center the board on screen
+    int startX = (screenWidth - BOARD_WIDTH * cellWidth) / 2;
+    int startY = (screenHeight - BOARD_HEIGHT) / 2;
+    
+    // Make sure the board fits on screen
+    if (startX < 0) startX = 0;
+    if (startY < 0) startY = 0;
+    
+    // Draw the game elements
+    drawBoard(graphicsLib, startX, startY, cellWidth, cellHeight);
+    drawSnake(graphicsLib, startX, startY, cellWidth, cellHeight);
+    drawFood(graphicsLib, startX, startY, cellWidth, cellHeight);
+    drawInfo(graphicsLib, startX, startY, cellWidth, cellHeight);
+}
+
+void SnakeGame::drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
+{
+    // Draw the border box
+    graphicsLib.drawBox(
+        startX - 1, 
+        startY - 1, 
+        BOARD_WIDTH * cellWidth + 2, 
+        BOARD_HEIGHT * cellHeight + 2, 
+        Color::CYAN
+    );
+    
+    // For SDL2 and other graphics libraries, we'll use a minimal approach
+    // for the board background - empty cells are just blank
+}
+
+void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
+{
+    (void)cellHeight; // Avoid unused parameter warning
+    
+    if (_snake.empty()) {
+        return;
+    }
+    
+    // Draw the snake head
+    Position head = _snake.front();
+    // Use simpler characters for better compatibility
+    std::string headChar = "O";
+    graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y, headChar, Color::YELLOW);
+    
+    // Draw the snake body
+    for (size_t i = 1; i < _snake.size(); i++) {
+        Position segment = _snake[i];
+        // Use simpler characters for better compatibility
+        std::string bodyChar = "o";
+        graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y, bodyChar, Color::GREEN);
+    }
+}
+
+void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
+{
+    (void)cellHeight; // Avoid unused parameter warning
+    
+    // Use simpler characters for better compatibility
+    std::string foodChar = "*";
+    graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y, foodChar, Color::RED);
+}
+
+void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
+{
+    (void)cellHeight; // Avoid unused parameter warning
+    
+    // Draw a box for the score
+    int scoreBoxWidth = 20;
+    int scoreBoxX = startX + (BOARD_WIDTH * cellWidth - scoreBoxWidth) / 2;
+    graphicsLib.drawBox(scoreBoxX - 1, startY - 3, scoreBoxWidth, 1, Color::WHITE);
+    
+    // Draw the score
+    std::string scoreText = "Score: " + std::to_string(_score);
+    int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length()) / 2;
+    graphicsLib.drawText(scoreX, startY - 3, scoreText, Color::WHITE);
+    
+    // Draw game over message if applicable
+    if (_gameOver) {
+        std::string gameOverText = "Game Over! Press 'R' to restart";
+        int gameOverBoxWidth = gameOverText.length() + 4;
+        int gameOverX = startX + (BOARD_WIDTH * cellWidth - gameOverBoxWidth) / 2;
+        int gameOverY = startY + BOARD_HEIGHT + 3;
+        
+        // Draw box around game over message
+        graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
+        
+        // Draw the message
+        graphicsLib.drawText(gameOverX, gameOverY, gameOverText, Color::RED);
+    }
 }
 
 void SnakeGame::moveSnake()
 {
-    Point newHead = _snake.front();
+    // Ensure the snake is not empty
+    if (_snake.empty()) {
+        return;
+    }
     
+    // Get current head position
+    Position newHead = _snake.front();
+    
+    // Calculate new head position based on direction
     switch (_direction) {
         case Direction::UP:
             newHead.y--;
+            // Wrap around vertically if needed
+            if (newHead.y < 0) {
+                newHead.y = BOARD_HEIGHT - 1;
+            }
             break;
         case Direction::DOWN:
             newHead.y++;
+            // Wrap around vertically if needed
+            if (newHead.y >= BOARD_HEIGHT) {
+                newHead.y = 0;
+            }
             break;
         case Direction::LEFT:
             newHead.x--;
+            // Wrap around horizontally if needed
+            if (newHead.x < 0) {
+                newHead.x = BOARD_WIDTH - 1;
+            }
             break;
         case Direction::RIGHT:
             newHead.x++;
+            // Wrap around horizontally if needed
+            if (newHead.x >= BOARD_WIDTH) {
+                newHead.x = 0;
+            }
             break;
     }
     
+    // Add new head to the front of the snake
     _snake.push_front(newHead);
 }
 
-bool SnakeGame::processEvent(const IEvent& event)
+bool SnakeGame::checkCollision(const Position& pos)
 {
-    if (_gameOver) {
-        // Check for restart
-        if (event.getType() == EventType::KEY_PRESSED && event.getKeyCode() == KeyCode::RESTART) {
-            restart();
-            return true;
-        }
-        return false;
-    }
+    // No wall collisions since we're implementing a cyclic play area
     
-    if (event.getType() != EventType::KEY_PRESSED) {
-        return false;
-    }
-    
-    switch (event.getKeyCode()) {
-        case KeyCode::UP:
-            if (_direction != Direction::DOWN) {
-                _nextDirection = Direction::UP;
-            }
-            return true;
-        case KeyCode::DOWN:
-            if (_direction != Direction::UP) {
-                _nextDirection = Direction::DOWN;
-            }
-            return true;
-        case KeyCode::LEFT:
-            if (_direction != Direction::RIGHT) {
-                _nextDirection = Direction::LEFT;
-            }
-            return true;
-        case KeyCode::RIGHT:
-            if (_direction != Direction::LEFT) {
-                _nextDirection = Direction::RIGHT;
-            }
-            return true;
-        default:
-            return false;
-    }
-}
-
-std::unique_ptr<IGameState> SnakeGame::getGameState() const
-{
-    // If we already have a cached state and nothing changed, return a copy of it
-    if (_gameState) {
-        return std::make_unique<GameState>(*static_cast<GameState*>(_gameState.get()));
-    }
-    
-    // Create a new game state
-    auto state = std::make_unique<GameState>(BOARD_WIDTH, BOARD_HEIGHT);
-    
-    // Set basic game information
-    state->setScore(_score);
-    state->setGameOver(_gameOver);
-    
-    if (_gameOver) {
-        state->setMessage("Game Over! Press 'r' to restart");
-    }
-    
-    // Add snake entities
-    for (size_t i = 0; i < _snake.size(); i++) {
-        const auto& segment = _snake[i];
-        std::string colorName = (i == 0) ? "GREEN" : "WHITE"; // Head is green, body is white
-        
-        auto entity = GameState::createEntity(
-            EntityType::PLAYER,
-            segment.x,
-            segment.y,
-            "█", // Use a block character for the snake
-            colorName
-        );
-        
-        // For the head, store its direction in properties
-        if (i == 0) {
-            entity.properties["isHead"] = true;
-            entity.properties["direction"] = static_cast<int>(_direction);
-        }
-        
-        state->addEntity(entity);
-    }
-    
-    // Add food entity
-    auto foodEntity = GameState::createEntity(
-        EntityType::COLLECTIBLE,
-        _food.x,
-        _food.y,
-        "█", // Use a block character for food too
-        "RED"
-    );
-    state->addEntity(foodEntity);
-    
-    // Cache this state
-    _gameState = std::make_unique<GameState>(*state);
-    
-    return state;
-}
-
-void SnakeGame::spawnFood()
-{
-    std::uniform_int_distribution<int> distX(0, BOARD_WIDTH - 1);
-    std::uniform_int_distribution<int> distY(0, BOARD_HEIGHT - 1);
-    
-    do {
-        _food = {distX(_rng), distY(_rng)};
-    } while (std::find(_snake.begin(), _snake.end(), _food) != _snake.end());
-    
-    // Clear game state cache so it will be regenerated
-    _gameState.reset();
-}
-
-bool SnakeGame::checkCollision(const Point& point) const
-{
-    // Check wall collision
-    if (point.x < 0 || point.x >= BOARD_WIDTH ||
-        point.y < 0 || point.y >= BOARD_HEIGHT) {
-        return true;
-    }
-    
-    // Check self collision (skip head)
+    // Check for self collision (skip the head)
     auto it = _snake.begin();
-    ++it;
+    ++it; // Skip the head since we're checking if the head collides with the body
+    
     for (; it != _snake.end(); ++it) {
-        if (*it == point) {
+        if (pos.x == it->x && pos.y == it->y) {
             return true;
         }
     }
     
     return false;
+}
+
+void SnakeGame::spawnFood()
+{
+    // Create distributions for random positions
+    std::uniform_int_distribution<int> distX(0, BOARD_WIDTH - 1);
+    std::uniform_int_distribution<int> distY(0, BOARD_HEIGHT - 1);
+    
+    // Try to find a position that doesn't overlap with the snake
+    bool validPosition = false;
+    
+    while (!validPosition) {
+        _food.x = distX(_rng);
+        _food.y = distY(_rng);
+        
+        validPosition = true;
+        
+        // Check if the food spawned on the snake
+        for (const auto& segment : _snake) {
+            if (_food.x == segment.x && _food.y == segment.y) {
+                validPosition = false;
+                break;
+            }
+        }
+    }
 }
 
 void SnakeGame::restart()
@@ -232,7 +316,7 @@ void SnakeGame::restart()
 
 void SnakeGame::cleanup()
 {
-    // Nothing to clean up
+    // No resources to clean up
 }
 
 bool SnakeGame::isGameOver() const
@@ -250,11 +334,6 @@ std::string SnakeGame::getName() const
     return "Snake";
 }
 
-std::string SnakeGame::getDescription() const
-{
-    return "Classic Snake game - eat food, grow longer, don't hit the walls or yourself!";
-}
-
 } // namespace arcd
 
 extern "C" {
@@ -263,6 +342,7 @@ extern "C" {
     }
     
     void destroyGameLibrary([[maybe_unused]] arcd::IGameLibrary* gameLib) {
-        // With smart pointers, this is not needed anymore
+        // With smart pointers, this function is not needed anymore
+        // but we keep it for compatibility
     }
 } 

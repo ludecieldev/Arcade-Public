@@ -1,23 +1,25 @@
 #ifndef SNAKE_GAME_HPP
 #define SNAKE_GAME_HPP
 
-#include "../interfaces/IGameLibrary.hpp"
-#include "../utils/GameState.hpp"
-#include "../utils/KeyCodes.hpp"
-#include <vector>
+#include "interfaces/IGameLibrary.hpp"
+#include <string>
 #include <deque>
 #include <random>
+#include <chrono>
 
 namespace arcd {
 
-struct Point {
+// Position struct for the snake and food
+struct Position {
     int x;
     int y;
-    bool operator==(const Point& other) const {
+    
+    bool operator==(const Position& other) const {
         return x == other.x && y == other.y;
     }
 };
 
+// Direction enum for the snake movement
 enum class Direction {
     UP,
     DOWN,
@@ -32,46 +34,54 @@ public:
 
     // Game lifecycle
     void initialize() override;
-    void update(double deltaTime) override;
+    void update() override;
     void restart() override;
     void cleanup() override;
 
     // Input handling
-    bool processEvent(const IEvent& event) override;
+    void handleInput(int key) override;
+
+    // Rendering
+    void render(IGraphicsLibrary& graphicsLib) override;
 
     // Game state
-    std::unique_ptr<IGameState> getGameState() const override;
-
-    // Game information
+    bool isGameOver() const override;
+    int getScore() const override;
     std::string getName() const override;
-    std::string getDescription() const override;
-    
-    // Additional methods for game state query
-    bool isGameOver() const;
-    int getScore() const;
 
 private:
+    // Game constants
     static constexpr int BOARD_WIDTH = 30;
     static constexpr int BOARD_HEIGHT = 20;
     static constexpr int INITIAL_SNAKE_LENGTH = 4;
-    static constexpr double UPDATE_INTERVAL = 0.1; // seconds
+    static constexpr int UPDATE_INTERVAL_MS = 150; // Milliseconds between updates
 
-    void spawnFood();
-    bool checkCollision(const Point& point) const;
-    void moveSnake();
-    void updateEntities();
-
-    std::deque<Point> _snake;
-    Point _food;
-    Direction _direction;
-    Direction _nextDirection;
+    // Game state
     bool _gameOver;
     int _score;
-    double _updateAccumulator;
+    
+    // Snake properties
+    std::deque<Position> _snake;
+    Direction _direction;
+    Direction _nextDirection;
+    
+    // Food property
+    Position _food;
+    
+    // Time tracking
+    std::chrono::time_point<std::chrono::high_resolution_clock> _lastUpdateTime;
+    
+    // Random number generator
     std::mt19937 _rng;
     
-    // Game state cache
-    mutable std::unique_ptr<GameState> _gameState;
+    // Helper methods
+    void spawnFood();
+    bool checkCollision(const Position& pos);
+    void moveSnake();
+    void drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight);
+    void drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight);
+    void drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight);
+    void drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight);
 };
 
 } // namespace arcd
