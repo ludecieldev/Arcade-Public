@@ -11,17 +11,14 @@
 
 int main(int argc, char** argv)
 {
-    // Check for correct number of arguments
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <graphics_library>" << std::endl;
         return 84;
     }
     
     try {
-        // Initialize the core with the specified graphics library
         arcd::Core core(argv[1]);
         
-        // Initialize and run the core
         if (!core.initialize()) {
             return 84;
         }
