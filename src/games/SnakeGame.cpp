@@ -145,11 +145,10 @@ void SnakeGame::handleInput(int key)
 }
 
 /**
- * @brief Render the game on screen
- * - Get screen dimensions
- * - Determine cell size based on graphics library
- * - Calculate position to center the board on screen
- * - Draw all game elements (board, snake, food, info)
+ * @brief Render the game
+ * - Clear the screen
+ * - Draw the board, snake, food and info
+ * - Refresh the display
  * 
  * @param graphicsLib Graphics library to use for rendering
  */
@@ -161,21 +160,12 @@ void SnakeGame::render(IGraphicsLibrary& graphicsLib)
     int cellWidth = 2;
     int cellHeight = 1;
     
-    bool isAllegro = (graphicsLib.getName() == "Allegro5");
-    
-    if (isAllegro) {
-        cellWidth = 15;
-        cellHeight = 15;
-    } else if (screenWidth < 80) {
+    if (screenWidth < 80) {
         cellWidth = 1;
     }
     
     int startX = (screenWidth - BOARD_WIDTH * cellWidth) / 2;
     int startY = (screenHeight - BOARD_HEIGHT * cellHeight) / 2;
-    
-    if (isAllegro) {
-        startY = (screenHeight - BOARD_HEIGHT * cellHeight) / 3;
-    }
     
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
@@ -211,7 +201,6 @@ void SnakeGame::drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY,
  * @brief Draw the snake on the board
  * - Draw the snake head with a different character
  * - Draw each snake body segment
- * - Adjust drawing based on graphics library
  * 
  * @param graphicsLib Graphics library to use for rendering
  * @param startX Starting X position of the board
@@ -221,7 +210,7 @@ void SnakeGame::drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY,
  */
 void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    bool isAllegro = (graphicsLib.getName() == "Allegro5");
+    (void)cellHeight; // Mark as unused to avoid compiler warnings
     
     if (_snake.empty()) {
         return;
@@ -230,29 +219,18 @@ void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY,
     Position head = _snake.front();
     std::string headChar = "O";
     
-    if (isAllegro) {
-        graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y * cellHeight, headChar, Color::YELLOW);
-        
-        for (size_t i = 1; i < _snake.size(); i++) {
-            Position segment = _snake[i];
-            std::string bodyChar = "o";
-            graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y * cellHeight, bodyChar, Color::GREEN);
-        }
-    } else {
-        graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y, headChar, Color::YELLOW);
-        
-        for (size_t i = 1; i < _snake.size(); i++) {
-            Position segment = _snake[i];
-            std::string bodyChar = "o";
-            graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y, bodyChar, Color::GREEN);
-        }
+    graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y, headChar, Color::YELLOW);
+    
+    for (size_t i = 1; i < _snake.size(); i++) {
+        Position segment = _snake[i];
+        std::string bodyChar = "o";
+        graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y, bodyChar, Color::GREEN);
     }
 }
 
 /**
  * @brief Draw the food on the board
  * - Draw the food with a special character
- * - Adjust drawing based on graphics library
  * 
  * @param graphicsLib Graphics library to use for rendering
  * @param startX Starting X position of the board
@@ -262,15 +240,10 @@ void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY,
  */
 void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    bool isAllegro = (graphicsLib.getName() == "Allegro5");
+    (void)cellHeight; // Mark as unused to avoid compiler warnings
     
     std::string foodChar = "*";
-    
-    if (isAllegro) {
-        graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y * cellHeight, foodChar, Color::RED);
-    } else {
-        graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y, foodChar, Color::RED);
-    }
+    graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y, foodChar, Color::RED);
 }
 
 /**
@@ -278,7 +251,6 @@ void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, 
  * - Draw score box
  * - Draw game over message if applicable
  * - Draw game controls help
- * - Adjust drawing based on graphics library
  * 
  * @param graphicsLib Graphics library to use for rendering
  * @param startX Starting X position of the board
@@ -288,54 +260,32 @@ void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, 
  */
 void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    bool isAllegro = (graphicsLib.getName() == "Allegro5");
+    (void)cellHeight; // Mark as unused to avoid compiler warnings
     
     int scoreBoxWidth = 20;
     int scoreBoxX = startX + (BOARD_WIDTH * cellWidth - scoreBoxWidth) / 2;
-    int scoreBoxY;
+    int scoreBoxY = startY - 3;
     
-    if (isAllegro) {
-        scoreBoxY = startY - cellHeight * 3;
-        graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, cellHeight, Color::WHITE);
-        
-        std::string scoreText = "Score: " + std::to_string(_score);
-        int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length() * 8) / 2;
-        graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
-    } else {
-        scoreBoxY = startY - 3;
-        graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, 1, Color::WHITE);
-        
-        std::string scoreText = "Score: " + std::to_string(_score);
-        int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length()) / 2;
-        graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
-    }
+    graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, 1, Color::WHITE);
+    
+    std::string scoreText = "Score: " + std::to_string(_score);
+    int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length()) / 2;
+    graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
     
     if (_gameOver) {
         std::string gameOverText = "Game Over!";
         std::string restartText = "Press R to restart";
         int gameOverBoxWidth = std::max(gameOverText.length(), restartText.length()) + 4;
         int gameOverX = startX + (BOARD_WIDTH * cellWidth - gameOverBoxWidth) / 2;
-        int gameOverY;
+        int gameOverY = startY + BOARD_HEIGHT / 2;
         
-        if (isAllegro) {
-            gameOverY = startY + (BOARD_HEIGHT * cellHeight) / 2 - cellHeight;
-            graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, cellHeight * 3, Color::RED);
-            
-            int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length() * 8) / 2;
-            graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
-            
-            int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length() * 8) / 2;
-            graphicsLib.drawText(restartX, gameOverY + cellHeight, restartText, Color::RED);
-        } else {
-            gameOverY = startY + BOARD_HEIGHT / 2;
-            graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
-            
-            int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length()) / 2;
-            graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
-            
-            int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length()) / 2;
-            graphicsLib.drawText(restartX, gameOverY + 1, restartText, Color::RED);
-        }
+        graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
+        
+        int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length()) / 2;
+        graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
+        
+        int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length()) / 2;
+        graphicsLib.drawText(restartX, gameOverY + 1, restartText, Color::RED);
     }
     
     std::vector<std::string> controlsInfo = {
@@ -351,20 +301,10 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
     };
     
     int controlsX = startX + BOARD_WIDTH * cellWidth + 4;
-    int controlsY;
+    int controlsY = startY + 1;
     
-    if (isAllegro) {
-        controlsY = startY;
-        
-        for (size_t i = 0; i < controlsInfo.size(); i++) {
-            graphicsLib.drawText(controlsX, controlsY + i * cellHeight * 2, controlsInfo[i], Color::CYAN);
-        }
-    } else {
-        controlsY = startY + 1;
-        
-        for (size_t i = 0; i < controlsInfo.size(); i++) {
-            graphicsLib.drawText(controlsX, controlsY + i, controlsInfo[i], Color::CYAN);
-        }
+    for (size_t i = 0; i < controlsInfo.size(); i++) {
+        graphicsLib.drawText(controlsX, controlsY + i, controlsInfo[i], Color::CYAN);
     }
 }
 
