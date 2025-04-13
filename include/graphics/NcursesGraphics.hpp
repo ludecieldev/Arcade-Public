@@ -9,9 +9,7 @@
 #define NCURSES_GRAPHICS_HPP
 
 #include "../interfaces/IGraphicsLibrary.hpp"
-#include "../interfaces/ICore.hpp"
-#include "../utils/Event.hpp"
-#include "../utils/KeyCodes.hpp"
+#include "../Core.hpp"
 #include <string>
 #include <vector>
 #include <map>
@@ -39,14 +37,13 @@ class NcursesGraphics : public IGraphicsLibrary {
         int _frameCounter;  // For animations
         struct termios _oldTermios;  // To restore terminal settings
         std::map<int, int> _colorPairs;
-        std::optional<std::reference_wrapper<ICore>> _core;
+        std::optional<std::reference_wrapper<Core>> _core;
 
         // Helper methods
         void updateTerminalSize();
         void showSplashScreen();
         int waitForKey(int timeoutMs);
         void waitForAnyKey();
-        int getKey();
 
         // Initialize color pairs
         void initColors();
@@ -57,14 +54,6 @@ class NcursesGraphics : public IGraphicsLibrary {
         // Helper method to clear input buffer
         void flushInputBuffer();
 
-        // Basic drawing methods
-        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT);
-        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT);
-        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT);
-        
-        // Player input
-        void getPlayerName(std::string& playerName);
-
         // Helper drawing methods
         void drawTextCentered(int y, const std::string& text, Color color = Color::DEFAULT);
         void drawBoxWithTitle(int x, int y, int width, int height, const std::string& title, Color color = Color::DEFAULT);
@@ -73,12 +62,6 @@ class NcursesGraphics : public IGraphicsLibrary {
         void drawVerticalLine(int x, int y, int height, Color color = Color::DEFAULT);
         void drawProgressBar(int x, int y, int width, int value, int maxValue, Color color = Color::DEFAULT);
         void drawBoldText(int x, int y, const std::string& text, Color color);
-        
-        // Map ncurses key code to our standard key codes
-        int mapKeyCode(int ncursesKey);
-        
-        // Drawing methods for game entities
-        void renderEntity(const Entity& entity);
 
     public:
         NcursesGraphics();
@@ -91,26 +74,37 @@ class NcursesGraphics : public IGraphicsLibrary {
         // Display functions
         void clear() override;
         void refresh() override;
-        
-        // Input polling - returns none if no event is available
-        std::optional<std::unique_ptr<IEvent>> pollEvent() override;
-        
-        // Game rendering - renders the game state
-        void renderGameState(const IGameState& gameState) override;
-        
-        // UI rendering - for menus, etc.
-        void renderUI(const std::vector<UIElement>& uiElements) override;
 
-        // Window information
-        int getWidth() const override { return _width; }
-        int getHeight() const override { return _height; }
+        // Drawing functions with color support
+        void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) override;
+        void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) override;
+        void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) override;
+
+        // Input handling
+        int getKey() override;
+
+        // Player name input
+        void getPlayerName(std::string& playerName) override;
 
         // Library information
         std::string getName() const override;
-        std::string getDescription() const override { return "Ncurses terminal-based graphics library"; }
+
+        // Window dimensions
+        int getWidth() const override { return _width; }
+        int getHeight() const override { return _height; }
 
         // Set core reference
-        void setCore(ICore& core) { _core = std::reference_wrapper<ICore>(core); }
+        void setCore(Core& core) { _core = std::reference_wrapper<Core>(core); }
+
+        // Menu drawing function that all graphics libraries should implement
+        void drawMenu(
+            const std::string& title,
+            const std::vector<std::string>& gameOptions,
+            const std::vector<std::string>& graphicOptions,
+            const std::string& playerName,
+            int selectedMenu,
+            int selectedGameIndex,
+            int selectedGraphicIndex) override;
 };
 
 }

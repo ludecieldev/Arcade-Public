@@ -19,6 +19,7 @@
 #include <map>
 #include <sstream>
 #include <ncurses.h>
+#include <filesystem>
 
 namespace arcd {
 
@@ -68,50 +69,37 @@ bool NcursesGraphics::initialize()
 {
     if (_initialized) return true;
     
-    // Initialiser la bibliothèque ncurses
-    initscr();
+    // Vérifier que le fichier de police existe (même si Ncurses n'en a pas directement besoin)
+    std::string fontPath = "assets/fonts/Arial.ttf";
+    if (!std::filesystem::exists(fontPath)) {
+        std::cerr << "Error: Font file not found: " << fontPath << std::endl;
+        std::cerr << "Ncurses Graphics library cannot start without this font." << std::endl;
+        exit(84); // Quitter avec le code 84 si la police n'est pas trouvée
+    }
     
-    // Vider les buffers d'entrée
-    flushinp();
+    // Initialize ncurses with proper settings
+    setlocale(LC_ALL, "");  // Enable UTF-8
+    initscr();              // Initialize ncurses
+    raw();                  // Disable line buffering
+    noecho();              // Don't echo keypresses
+    curs_set(0);           // Hide cursor
+    keypad(stdscr, TRUE);  // Enable keypad input
+    nodelay(stdscr, TRUE); // Non-blocking input
+    start_color();         // Enable colors
+    use_default_colors();  // Use terminal's default colors
     
-    // Configurer ncurses pour l'utilisation des couleurs
-    start_color();
-    use_default_colors();
+    // Initialize color pairs
+    init_pair(1, COLOR_BLACK, -1);
+    init_pair(2, COLOR_RED, -1);
+    init_pair(3, COLOR_GREEN, -1);
+    init_pair(4, COLOR_YELLOW, -1);
+    init_pair(5, COLOR_BLUE, -1);
+    init_pair(6, COLOR_MAGENTA, -1);
+    init_pair(7, COLOR_CYAN, -1);
+    init_pair(8, COLOR_WHITE, -1);
     
-    // Configurer pour que getch() ne bloque pas
-    nodelay(stdscr, TRUE);
-    
-    // Désactiver l'écho des touches pour éviter les doublons
-    noecho();
-    
-    // Activer la lecture des touches spéciales (flèches, etc.)
-    keypad(stdscr, TRUE);
-    
-    // Masquer le curseur par défaut
-    curs_set(0);
-    
-    // Désactiver le buffering d'entrée (cause souvent des doublons)
-    cbreak();
-    
-    // Désactiver le flush automatique (stdout et stderr)
-    setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
-    
-    // Récupérer la taille du terminal
+    // Get terminal size
     updateTerminalSize();
-    
-    // Initialiser les paires de couleurs
-    init_pair(1, COLOR_BLACK, -1);    // NOIR sur fond par défaut
-    init_pair(2, COLOR_RED, -1);      // ROUGE sur fond par défaut
-    init_pair(3, COLOR_GREEN, -1);    // VERT sur fond par défaut
-    init_pair(4, COLOR_YELLOW, -1);   // JAUNE sur fond par défaut
-    init_pair(5, COLOR_BLUE, -1);     // BLEU sur fond par défaut
-    init_pair(6, COLOR_MAGENTA, -1);  // MAGENTA sur fond par défaut
-    init_pair(7, COLOR_CYAN, -1);     // CYAN sur fond par défaut
-    init_pair(8, COLOR_WHITE, -1);    // BLANC sur fond par défaut
-    
-    // Afficher l'écran de démarrage
-    showSplashScreen();
     
     _initialized = true;
     return true;
@@ -255,112 +243,94 @@ void NcursesGraphics::drawList(int x, int y, const std::vector<std::string>& ite
 
 void NcursesGraphics::getPlayerName(std::string& playerName)
 {
-    if (!_initialized)
-        return;
-
-    // Vider le buffer d'entrée pour éviter les doublons initiaux
-    flushinp();
+    if (!_initialized) return;
     
-    // Désactiver complètement l'écho des caractères
-    noecho();
+    clear();
     
-    // Créer une fenêtre d'entrée avec un fond coloré pour la visibilité
-    WINDOW* inputWin = newwin(5, 50, (_height - 5) / 2, (_width - 50) / 2);
-    box(inputWin, 0, 0);
-    wbkgd(inputWin, COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
-    mvwprintw(inputWin, 1, 2, "Enter your name:");
-    mvwprintw(inputWin, 3, 2, "Press Enter when done, Esc to cancel");
+    // Draw title box
+    int boxWidth = 40;
+    int boxHeight = 3;
+    int startX = (_width - boxWidth) / 2;
+    int startY = (_height - boxHeight) / 2 - 2;
     
-    // Zone d'entrée
-    WINDOW* textWin = derwin(inputWin, 1, 40, 2, 5);
-    wbkgd(textWin, COLOR_PAIR(getColorPair(COLOR_BLACK, COLOR_WHITE)));
-    keypad(textWin, TRUE);
+    // Draw header
+    drawBoldText(startX + (boxWidth - 16) / 2, startY - 2, "Enter Your Name:", Color::CYAN);
     
-    // Affichage initial
-    wrefresh(inputWin);
-    wrefresh(textWin);
+    // Draw input box
+    drawBox(startX, startY, boxWidth, boxHeight, Color::WHITE);
     
-    // Variables pour suivre l'entrée
-    playerName.clear();
-    bool done = false;
-    int cursor_x = 0;
+    // Enable input mode
+    curs_set(1);  // Show cursor
+    echo();       // Show typed characters
     
-    // Activer le curseur
-    curs_set(1);
+    // Move cursor to input position
+    int inputX = startX + 2;
+    int inputY = startY + 1;
+    move(inputY, inputX);
+    refresh();
     
-    // Boucle d'entrée
-    while (!done) {
-        // Positionner le curseur
-        wmove(textWin, 0, cursor_x);
-        wrefresh(textWin);
-        
-        // Obtenir l'entrée
-        int ch = wgetch(textWin);
-        
-        // Traiter l'entrée
-        switch (ch) {
-            case 10:  // Enter
-            case KEY_ENTER:
-                done = true;
-                break;
-                
-            case 27:  // Escape
-                playerName.clear();
-                done = true;
-                break;
-                
-            case KEY_BACKSPACE:
-            case 127:  // Backspace
-                if (!playerName.empty()) {
-                    playerName.pop_back();
-                    cursor_x--;
-                    
-                    // Effacer le caractère
-                    mvwaddch(textWin, 0, cursor_x, ' ');
-                    wmove(textWin, 0, cursor_x);
-                    wrefresh(textWin);
-                }
-                break;
-                
-            default:
-                // N'accepter que les caractères imprimables
-                if (isprint(ch) && playerName.length() < 20) {
-                    playerName += ch;
-                    mvwaddch(textWin, 0, cursor_x, ch);
-                    cursor_x++;
-                    wrefresh(textWin);
-                }
-                break;
+    // Get input
+    char input[256];
+    memset(input, 0, sizeof(input));
+    
+    // Configure input field
+    WINDOW* inputWin = newwin(1, boxWidth - 4, inputY, inputX);
+    keypad(inputWin, TRUE);
+    
+    // Read input
+    int ch;
+    int pos = 0;
+    while ((ch = wgetch(inputWin)) != '\n' && ch != KEY_ENTER && ch != KEY_ESC_CODE) {
+        if (ch == KEY_BACKSPACE || ch == 127) {
+            if (pos > 0) {
+                pos--;
+                input[pos] = '\0';
+                mvwaddch(inputWin, 0, pos, ' ');
+                wmove(inputWin, 0, pos);
+                wrefresh(inputWin);
+            }
+        } else if (pos < static_cast<int>(sizeof(input) - 1) && isprint(ch)) {
+            input[pos] = ch;
+            pos++;
+            input[pos] = '\0';
         }
+        wrefresh(inputWin);
     }
     
-    // Masquer le curseur et nettoyer
+    // Restore terminal settings
+    noecho();
     curs_set(0);
-    delwin(textWin);
+    
+    // Update player name if input is not empty
+    if (pos > 0) {
+        playerName = input;
+    }
+    
+    // Clean up
     delwin(inputWin);
-    
-    // Nettoyer complètement le buffer d'entrée
-    flushinp();
-    
-    // Retour à l'écran principal
     clear();
     refresh();
 }
 
 int NcursesGraphics::getKey()
 {
-    if (!_initialized)
-        return 0;
+    if (!_initialized) return 0;
     
     int ch = getch();
+    if (ch == ERR) return 0;
     
-    if (ch == ERR)
-        return 0;
-    
-    // Vider le tampon d'entrée pour éviter les échos de touches
-    flushinp();
-    
-    return mapKeyCode(ch);
+    switch (ch) {
+        case KEY_UP: return KEY_UP_CODE;
+        case KEY_DOWN: return KEY_DOWN_CODE;
+        case KEY_LEFT: return KEY_LEFT_CODE;
+        case KEY_RIGHT: return KEY_RIGHT_CODE;
+        case 27: return KEY_ESC_CODE;
+        case KEY_BACKSPACE: return KEY_BACKSPACE_CODE;
+        case 10: return KEY_ENTER_CODE;
+        case '9': return KEY_NEXT_LIB_CODE;
+        case '7': return KEY_NEXT_GAME_CODE;
+        default: return ch;
+    }
 }
 
 void NcursesGraphics::flushInputBuffer()
@@ -413,8 +383,7 @@ int NcursesGraphics::waitForKey(int timeoutMs)
     int result = poll(&pfd, 1, timeoutMs);
     
     if (result > 0 && (pfd.revents & POLLIN)) {
-        int ch = getch();
-        return mapKeyCode(ch);
+        return getKey();
     }
     
     return 0;
@@ -493,191 +462,151 @@ void NcursesGraphics::drawBoldText(int x, int y, const std::string& text, Color 
     attroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
 }
 
-// Map ncurses key code to our standard key codes
-int NcursesGraphics::mapKeyCode(int ncursesKey)
-{
-    switch (ncursesKey) {
-        case KEY_UP:            return KeyCode::UP;
-        case KEY_DOWN:          return KeyCode::DOWN;
-        case KEY_LEFT:          return KeyCode::LEFT;
-        case KEY_RIGHT:         return KeyCode::RIGHT;
-        case 27:                return KeyCode::ESC;
-        case KEY_BACKSPACE:     return KeyCode::BACKSPACE;
-        case 10:                return KeyCode::ENTER; // Return key
-        case KEY_ENTER:         return KeyCode::ENTER; // Keypad Enter
-        case ' ':               return KeyCode::SPACE;
-        case '7':               return KeyCode::NEXT_GAME;
-        case '8':               return KeyCode::PREV_GAME;
-        case '9':               return KeyCode::NEXT_LIB;
-        case '0':               return KeyCode::PREV_LIB;
-        case 'r':
-        case 'R':               return KeyCode::RESTART;
-        case 'p':
-        case 'P':               return KeyCode::PAUSE;
-        case 'q':
-        case 'Q':               return KeyCode::QUIT;
-        default:                return ncursesKey;
-    }
-}
-
-// NEW METHODS
-
-std::optional<std::unique_ptr<IEvent>> NcursesGraphics::pollEvent()
-{
-    if (!_initialized) {
-        return std::nullopt;
-    }
-
-    // Configurer le timeout pour nodelay
-    timeout(0);
-    
-    // Récupérer une touche, ne bloque pas grâce au timeout(0)
-    int ch = getch();
-    
-    // Si pas de touche, retourner nullopt
-    if (ch == ERR) {
-        return std::nullopt;
-    }
-    
-    // Vider le tampon d'entrée pour éviter les doublons
-    flushinp();
-    
-    // Si c'est une touche spéciale, la mapper sur notre système de codes
-    int mappedKey = mapKeyCode(ch);
-    
-    // Créer et retourner un événement clavier
-    return std::make_optional(IEvent::createKeyEvent(mappedKey, true));
-}
-
-void NcursesGraphics::renderEntity(const Entity& entity)
+void NcursesGraphics::drawMenu(
+    const std::string& title,
+    const std::vector<std::string>& gameOptions,
+    const std::vector<std::string>& graphicOptions,
+    const std::string& playerName,
+    int selectedMenu,
+    int selectedGameIndex,
+    int selectedGraphicIndex)
 {
     if (!_initialized) return;
     
-    // Convert string to Color enum
-    Color color = Color::WHITE;
-    if (entity.colorName == "BLACK") color = Color::BLACK;
-    else if (entity.colorName == "RED") color = Color::RED;
-    else if (entity.colorName == "GREEN") color = Color::GREEN;
-    else if (entity.colorName == "YELLOW") color = Color::YELLOW;
-    else if (entity.colorName == "BLUE") color = Color::BLUE;
-    else if (entity.colorName == "MAGENTA") color = Color::MAGENTA;
-    else if (entity.colorName == "CYAN") color = Color::CYAN;
+    clear();
     
-    // Draw the entity
-    if (entity.symbol.length() == 1) {
-        // Single character entity
-        attron(COLOR_PAIR(static_cast<int>(color)));
-        for (int y = 0; y < entity.height; y++) {
-            for (int x = 0; x < entity.width; x++) {
-                mvaddch(entity.y + y, entity.x + x, entity.symbol[0]);
-            }
+    // Draw centered title with decoration
+    attron(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)) | A_BOLD);
+    drawTextCentered(1, "=== " + title + " ===", Color::WHITE);
+    attroff(A_BOLD);
+    
+    // Calculate positions for menu boxes
+    int boxWidth = 25;  // Augmenter la largeur
+    int boxHeight = 12; // Augmenter la hauteur
+    int spacing = 4;
+    int startX = (_width - (3 * boxWidth + 2 * spacing)) / 2;
+    int startY = 3;
+    
+    // Préparer les noms simplifiés
+    std::vector<std::string> displayGameNames;
+    for (const auto& name : gameOptions) {
+        std::string displayName = name;
+        // Enlever le préfixe "arcade_" s'il existe
+        size_t prefixPos = displayName.find("arcade_");
+        if (prefixPos != std::string::npos) {
+            displayName = displayName.substr(prefixPos + 7); // 7 est la longueur de "arcade_"
         }
-        attroff(COLOR_PAIR(static_cast<int>(color)));
+        // Enlever l'extension ".so" s'il existe
+        size_t extPos = displayName.find(".so");
+        if (extPos != std::string::npos) {
+            displayName = displayName.substr(0, extPos);
+        }
+        displayGameNames.push_back(displayName);
+    }
+    
+    std::vector<std::string> displayGraphicNames;
+    for (const auto& name : graphicOptions) {
+        std::string displayName = name;
+        // Enlever le préfixe "arcade_" s'il existe
+        size_t prefixPos = displayName.find("arcade_");
+        if (prefixPos != std::string::npos) {
+            displayName = displayName.substr(prefixPos + 7); // 7 est la longueur de "arcade_"
+        }
+        // Enlever l'extension ".so" s'il existe
+        size_t extPos = displayName.find(".so");
+        if (extPos != std::string::npos) {
+            displayName = displayName.substr(0, extPos);
+        }
+        displayGraphicNames.push_back(displayName);
+    }
+    
+    // Draw game options box
+    bool isGameBoxSelected = (selectedMenu == 0);
+    Color gameBoxColor = isGameBoxSelected ? Color::YELLOW : Color::WHITE;
+    drawBoxWithTitle(startX, startY, boxWidth, boxHeight, "Games", gameBoxColor);
+    
+    // Draw game options
+    for (size_t i = 0; i < displayGameNames.size() && i < static_cast<size_t>(boxHeight - 2); i++) {
+        Color itemColor = (isGameBoxSelected && static_cast<int>(i) == selectedGameIndex) 
+                          ? Color::YELLOW : Color::WHITE;
+        
+        if (isGameBoxSelected && static_cast<int>(i) == selectedGameIndex) {
+            attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            mvprintw(startY + 2 + static_cast<int>(i), startX + 2, "> %s", displayGameNames[i].c_str());
+            attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+        } else {
+            drawText(startX + 2, startY + 2 + static_cast<int>(i), displayGameNames[i], itemColor);
+        }
+    }
+    
+    // Draw graphics options box
+    bool isGraphicsBoxSelected = (selectedMenu == 1);
+    Color graphicsBoxColor = isGraphicsBoxSelected ? Color::YELLOW : Color::WHITE;
+    drawBoxWithTitle(startX + boxWidth + spacing, startY, boxWidth, boxHeight, "Graphics", graphicsBoxColor);
+    
+    // Draw graphics options
+    for (size_t i = 0; i < displayGraphicNames.size() && i < static_cast<size_t>(boxHeight - 2); i++) {
+        Color itemColor = (isGraphicsBoxSelected && static_cast<int>(i) == selectedGraphicIndex) 
+                          ? Color::YELLOW : Color::WHITE;
+        
+        if (isGraphicsBoxSelected && static_cast<int>(i) == selectedGraphicIndex) {
+            attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            mvprintw(startY + 2 + static_cast<int>(i), startX + boxWidth + spacing + 2, "> %s", displayGraphicNames[i].c_str());
+            attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+        } else {
+            drawText(startX + boxWidth + spacing + 2, startY + 2 + static_cast<int>(i), 
+                    displayGraphicNames[i], itemColor);
+        }
+    }
+    
+    // Draw player name box
+    bool isPlayerBoxSelected = (selectedMenu == 2);
+    Color playerBoxColor = isPlayerBoxSelected ? Color::YELLOW : Color::WHITE;
+    drawBoxWithTitle(startX + 2 * (boxWidth + spacing), startY, boxWidth, boxHeight, "Player", playerBoxColor);
+    
+    // Display player name (shortened if too long)
+    std::string displayName = playerName;
+    if (displayName.length() > static_cast<size_t>(boxWidth - 4)) {
+        displayName = displayName.substr(0, boxWidth - 7) + "...";
+    }
+    
+    if (isPlayerBoxSelected) {
+        attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+        mvprintw(startY + 2, startX + 2 * (boxWidth + spacing) + 2, "> %s", displayName.c_str());
+        attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
     } else {
-        // String entity (just display at position)
-        drawText(entity.x, entity.y, entity.symbol, color);
-    }
-}
-
-void NcursesGraphics::renderGameState(const IGameState& gameState)
-{
-    if (!_initialized) return;
-    
-    clear();  // Effacer l'écran avant de dessiner
-    
-    // Récupérer toutes les entités du jeu
-    const auto& entities = gameState.getEntities();
-    
-    // Afficher chaque entité
-    for (const auto& entity : entities) {
-        // Obtenir la couleur de l'entité
-        Color color = Color::WHITE;  // Couleur par défaut
-        
-        if (entity.colorName == "RED") color = Color::RED;
-        else if (entity.colorName == "GREEN") color = Color::GREEN;
-        else if (entity.colorName == "BLUE") color = Color::BLUE;
-        else if (entity.colorName == "YELLOW") color = Color::YELLOW;
-        else if (entity.colorName == "MAGENTA") color = Color::MAGENTA;
-        else if (entity.colorName == "CYAN") color = Color::CYAN;
-        else if (entity.colorName == "WHITE") color = Color::WHITE;
-        
-        // Utiliser le symbole de l'entité ou un caractère par défaut
-        std::string symbol = entity.symbol.empty() ? "█" : entity.symbol;
-        
-        // Dessiner l'entité à sa position
-        attron(COLOR_PAIR(static_cast<int>(color)));
-        mvaddstr(entity.y, entity.x, symbol.c_str());
-        attroff(COLOR_PAIR(static_cast<int>(color)));
+        drawText(startX + 2 * (boxWidth + spacing) + 2, startY + 2, displayName, playerBoxColor);
     }
     
-    // Si le jeu est terminé, afficher un message
-    if (gameState.isGameOver()) {
-        std::string message = "GAME OVER - Press 'R' to restart";
-        drawTextCentered(_height / 2, message, Color::RED);
-    }
+    // Draw instructions box with large spacing
+    int instructionY = startY + boxHeight + 2;
+    drawBox(startX, instructionY, 3 * boxWidth + 2 * spacing, 9, Color::BLUE);
     
-    // Afficher le score dans un coin
-    std::string scoreText = "Score: " + std::to_string(gameState.getScore());
-    drawText(2, 1, scoreText, Color::YELLOW);
+    // Draw instructions title
+    attron(COLOR_PAIR(getColorPair(COLOR_CYAN, COLOR_BLACK)) | A_BOLD);
+    drawTextCentered(instructionY, "CONTROLS", Color::CYAN);
+    attroff(A_BOLD);
     
-    // Rafraîchir l'écran
-    refresh();
-}
-
-void NcursesGraphics::renderUI(const std::vector<UIElement>& uiElements)
-{
-    if (!_initialized) return;
+    // Draw instructions with clear separation
+    std::vector<std::pair<std::string, std::string>> instructions = {
+        {"SELECT", "TAB key"},
+        {"NAVIGATE", "Arrow keys"},
+        {"CONFIRM", "Enter key"},
+        {"EXIT", "Escape key"}
+    };
     
-    for (const auto& element : uiElements) {
-        switch (element.type) {
-            case UIElementType::TEXT: {
-                if (element.selected) {
-                    drawBoldText(element.x, element.y, element.text, element.color);
-                } else {
-                    drawText(element.x, element.y, element.text, element.color);
-                }
-                break;
-            }
-            case UIElementType::BUTTON: {
-                int textX = element.x + (element.width - element.text.length()) / 2;
-                int textY = element.y + element.height / 2;
-                drawBox(element.x, element.y, element.width, element.height, element.color);
-                if (element.selected) {
-                    drawBoldText(textX, textY, element.text, element.color);
-                } else {
-                    drawText(textX, textY, element.text, element.color);
-                }
-                break;
-            }
-            case UIElementType::LIST: {
-                auto items = std::any_cast<std::vector<std::string>>(
-                    element.properties.at("items"));
-                int selectedIndex = std::any_cast<int>(
-                    element.properties.at("selectedIndex"));
-                drawList(element.x, element.y, items, selectedIndex, element.color);
-                break;
-            }
-            case UIElementType::PROGRESS_BAR: {
-                int value = std::any_cast<int>(element.properties.at("value"));
-                int maxValue = std::any_cast<int>(element.properties.at("maxValue"));
-                drawProgressBar(element.x, element.y, element.width, value, maxValue, element.color);
-                break;
-            }
-            case UIElementType::PANEL: {
-                drawBox(element.x, element.y, element.width, element.height, element.color);
-                if (!element.text.empty()) {
-                    drawBoxWithTitle(element.x, element.y, element.width, element.height, element.text, element.color);
-                }
-                break;
-            }
-            case UIElementType::INPUT_FIELD: {
-                drawBox(element.x, element.y, element.width, element.height, element.color);
-                drawText(element.x + 1, element.y + element.height / 2, element.text, element.color);
-                break;
-            }
-            default:
-                break;
-        }
+    for (size_t i = 0; i < instructions.size(); i++) {
+        int y = instructionY + 2 + static_cast<int>(i) * 2; // Double spacing
+        
+        // Draw label in bold yellow
+        attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+        mvprintw(y, startX + 4, "%s:", instructions[i].first.c_str());
+        attroff(A_BOLD);
+        
+        // Draw instruction in white
+        attron(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
+        mvprintw(y, startX + 15, "%s", instructions[i].second.c_str());
+        attroff(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
     }
     
     refresh();
