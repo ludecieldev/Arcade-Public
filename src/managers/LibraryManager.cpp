@@ -10,7 +10,10 @@
 #include <iostream>
 
 namespace arcd {
-
+/**
+ * @brief Constructor for LibraryManager
+ * @param libDirectory Directory where libraries are located
+ */
 LibraryManager::LibraryManager(const std::string& libDirectory)
     : _libDirectory(libDirectory), _currentGraphicsIndex(0), _currentGameIndex(0)
 {
@@ -18,12 +21,19 @@ LibraryManager::LibraryManager(const std::string& libDirectory)
     _gameLoader = std::make_unique<DLLoader>();
 }
 
+/**
+ * @brief Constructor for LibraryManager
+ * @param libDirectory Directory where libraries are located
+ */
 LibraryManager::~LibraryManager()
 {
     unloadCurrentGraphicsLibrary();
     unloadCurrentGameLibrary();
 }
 
+/**
+ * @brief Scans the library directory for available libraries
+ */
 void LibraryManager::scanLibraries()
 {
     _graphicsLibs.clear();
@@ -61,6 +71,10 @@ void LibraryManager::scanLibraries()
     }
 }
 
+/**
+ * @brief Returns the list of available graphics libraries
+ * @return List of graphics library names
+ */
 std::vector<std::string> LibraryManager::getGraphicsLibraries() const
 {
     std::vector<std::string> libs;
@@ -70,6 +84,10 @@ std::vector<std::string> LibraryManager::getGraphicsLibraries() const
     return libs;
 }
 
+/**
+ * @brief Returns the list of available game libraries
+ * @return List of game library names
+ */
 std::vector<std::string> LibraryManager::getGameLibraries() const
 {
     std::vector<std::string> libs;
@@ -79,6 +97,11 @@ std::vector<std::string> LibraryManager::getGameLibraries() const
     return libs;
 }
 
+/**
+ * @brief Loads a graphics library by name
+ * @param name Name of the graphics library to load
+ * @return True if successful, false otherwise
+ */
 bool LibraryManager::loadGraphicsLibrary(const std::string& name)
 {
     // Unload current library if any
@@ -126,6 +149,10 @@ bool LibraryManager::loadGraphicsLibrary(const std::string& name)
     return true;
 }
 
+/**
+ * @brief Returns the currently loaded graphics library
+ * @return Reference to the current graphics library
+ */
 IGraphicsLibrary& LibraryManager::getCurrentGraphicsLibrary()
 {
     if (!_currentGraphicsLib || !_graphicsLoader->isLoaded()) {
@@ -135,11 +162,19 @@ IGraphicsLibrary& LibraryManager::getCurrentGraphicsLibrary()
     return *_currentGraphicsLib;
 }
 
+/**
+ * @brief Checks if a graphics library is currently loaded
+ * @return True if a graphics library is loaded, false otherwise
+ */
 bool LibraryManager::hasGraphicsLibrary() const
 {
     return _currentGraphicsLib != nullptr && _graphicsLoader->isLoaded();
 }
 
+/**
+ * @brief Loads the next graphics library in the list
+ * @return True if successful, false otherwise
+ */
 bool LibraryManager::loadNextGraphicsLibrary()
 {
     // Implementation of graphics library switching
@@ -156,6 +191,11 @@ bool LibraryManager::loadNextGraphicsLibrary()
     return loadGraphicsLibrary(it->first);
 }
 
+/**
+ * @brief Loads a game library by name
+ * @param name Name of the game library to load
+ * @return True if successful, false otherwise
+ */
 bool LibraryManager::loadGameLibrary(const std::string& name)
 {
     // Unload current library if any
@@ -196,6 +236,10 @@ bool LibraryManager::loadGameLibrary(const std::string& name)
     return true;
 }
 
+/**
+ * @brief Returns the currently loaded game library
+ * @return Reference to the current game library
+ */
 IGameLibrary& LibraryManager::getCurrentGameLibrary()
 {
     if (!_currentGameLib || !_gameLoader->isLoaded()) {
@@ -205,11 +249,19 @@ IGameLibrary& LibraryManager::getCurrentGameLibrary()
     return *_currentGameLib;
 }
 
+/**
+ * @brief Checks if a game library is currently loaded
+ * @return True if a game library is loaded, false otherwise
+ */
 bool LibraryManager::hasGameLibrary() const
 {
     return _currentGameLib != nullptr && _gameLoader->isLoaded();
 }
 
+/**
+ * @brief Loads the next game library in the list
+ * @return True if successful, false otherwise
+ */
 bool LibraryManager::loadNextGameLibrary()
 {
     // Implementation of game library switching
@@ -226,6 +278,9 @@ bool LibraryManager::loadNextGameLibrary()
     return loadGameLibrary(it->first);
 }
 
+/**
+ * @brief Unloads the currently loaded graphics library
+ */
 void LibraryManager::unloadCurrentGraphicsLibrary()
 {
     if (_currentGraphicsLib) {
@@ -249,6 +304,9 @@ void LibraryManager::unloadCurrentGraphicsLibrary()
     }
 }
 
+/**
+ * @brief Unloads the currently loaded game library
+ */
 void LibraryManager::unloadCurrentGameLibrary()
 {
     if (_currentGameLib) {
@@ -272,6 +330,10 @@ void LibraryManager::unloadCurrentGameLibrary()
     }
 }
 
+/**
+ * @brief Returns the last error message
+ * @return Last error message
+ */
 std::string LibraryManager::getLastError() const
 {
     return _lastError;
