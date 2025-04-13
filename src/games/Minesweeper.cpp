@@ -6,35 +6,46 @@
 
 namespace arcd {
 
+/**
+ * @brief Minesweeper game implementation
+ * This class implements the Minesweeper game logic.
+ */
 MinesweeperGame::MinesweeperGame()
     : _rows(9), _cols(9), _mines(10),
       _gameOver(false), _win(false), _flagsUsed(0),
-      _cursorRow(0), _cursorCol(0)
+      _cursorRow(0), _cursorCol(0), _currentScore(0),
+      _maxTime(std::chrono::seconds(300)), // 5 minutes
+      _timerStarted(false)
 {
-    // Initialize the game in constructor to ensure grid is always valid
     initializeGrid();
 }
 
+/**
+ * @brief Initializes the game state
+ * Resets the game state and initializes the grid.
+ */
 void MinesweeperGame::initialize()
 {
-    // Reset game state
     _gameOver = false;
     _win = false;
     _flagsUsed = 0;
     _cursorRow = 0;
     _cursorCol = 0;
+    _currentScore = 0;
+    _timerStarted = false;
 
-    // Initialize grid
     initializeGrid();
 }
 
+/**
+ * @brief Initializes the grid with cells and mines
+ * Resizes the grid and initializes all cells.
+ */
 void MinesweeperGame::initializeGrid()
 {
-    // Resize and initialize the grid
     _grid.clear();
     _grid.resize(_rows, std::vector<Cell>(_cols));
 
-    // Initialize all cells
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
             _grid[i][j].isMine = false;
@@ -43,14 +54,16 @@ void MinesweeperGame::initializeGrid()
         }
     }
 
-    // Place mines and calculate adjacent mines
     placeMines();
     calculateAdjacentMines();
 }
 
+/**
+ * @brief Handles user input
+ * @param key Key pressed by the user
+ */
 void MinesweeperGame::placeMines()
 {
-    // Create a vector of all possible positions
     std::vector<std::pair<int, int>> positions;
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
@@ -58,11 +71,9 @@ void MinesweeperGame::placeMines()
         }
     }
 
-    // Use a random number generator with time-based seed
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::shuffle(positions.begin(), positions.end(), std::default_random_engine(seed));
 
-    // Place mines at the first N positions (where N = _mines)
     for (int i = 0; i < _mines && i < static_cast<int>(positions.size()); i++) {
         int row = positions[i].first;
         int col = positions[i].second;
@@ -70,23 +81,26 @@ void MinesweeperGame::placeMines()
     }
 }
 
+/**
+ * @brief Reveals a cell
+ * @param row Row of the cell to reveal
+ * @param col Column of the cell to reveal
+ */
 void MinesweeperGame::calculateAdjacentMines()
 {
     // For each cell, count adjacent mines
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
-            if (_grid[i][j].isMine) continue; // Skip mine cells
+            if (_grid[i][j].isMine) continue;
 
             int count = 0;
-            // Check all 8 adjacent cells
             for (int di = -1; di <= 1; di++) {
                 for (int dj = -1; dj <= 1; dj++) {
-                    if (di == 0 && dj == 0) continue; // Skip self
+                    if (di == 0 && dj == 0) continue;
 
                     int ni = i + di;
                     int nj = j + dj;
 
-                    // Bounds check
                     if (ni >= 0 && ni < _rows && nj >= 0 && nj < _cols) {
                         if (_grid[ni][nj].isMine) {
                             count++;
@@ -100,48 +114,119 @@ void MinesweeperGame::calculateAdjacentMines()
     }
 }
 
+/**
+ * @brief Reveals a cell
+ * @param row Row of the cell to reveal
+ * @param col Column of the cell to reveal
+ */
+int MinesweeperGame::getRemainingTimeSeconds() const
+{
+    if (!_timerStarted) {
+        return _maxTime.count();
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - _startTime);
+
+    int remaining = _maxTime.count() - elapsed.count();
+    return std::max(0, remaining);
+}
+
+/**
+ * @brief Toggles a flag on a cell
+ * @param row Row of the cell to toggle
+ * @param col Column of the cell to toggle
+ */
+void MinesweeperGame::updateScore()
+{
+    int revealedCount = 0;
+
+    for (int i = 0; i < _rows; i++) {
+        for (int j = 0; j < _cols; j++) {
+            if (_grid[i][j].state == CellState::REVEALED && !_grid[i][j].isMine) {
+                revealedCount++;
+            }
+        }
+    }
+
+    _currentScore = revealedCount * 10;
+}
+
+/**
+ * @brief Checks if the game is over
+ * @return True if the game is over, false otherwise
+ */
 void MinesweeperGame::update()
 {
-    // Check for win condition
+    if (!_timerStarted) {
+        _startTime = std::chrono::steady_clock::now();
+        _timerStarted = true;
+    }
+
+    updateScore();
+
+    if (getRemainingTimeSeconds() <= 0 && !_gameOver) {
+        _gameOver = true;
+        _win = false;
+    }
+
     if (!_gameOver && !_win) {
         _win = isWinConditionMet();
         if (_win) {
+            _currentScore += getRemainingTimeSeconds() * 2;
             _gameOver = true;
         }
     }
 }
 
+/**
+ * @brief Renders the game
+ * @param graphics Reference to the graphics library
+ */
 void MinesweeperGame::render(IGraphicsLibrary& graphics)
 {
-    // Always validate that the grid is properly initialized
     if (_grid.empty() || _grid[0].empty()) {
         initializeGrid();
     }
 
-    // Constants for rendering
     const int startX = 5;
     const int startY = 3;
     const int cellWidth = 3;
     const int cellHeight = 1;
 
-    // Clear screen and draw title
     graphics.clear();
     graphics.drawText(startX, startY - 2, "MINESWEEPER", Color::GREEN);
 
-    // Draw game info
     std::string minesInfo = "Mines: " + std::to_string(_mines) + "  Flags: "
                           + std::to_string(_flagsUsed) + "/" + std::to_string(_mines);
     graphics.drawText(startX, startY - 1, minesInfo, Color::WHITE);
 
-    // Draw grid
+    int remainingTime = getRemainingTimeSeconds();
+    int minutes = remainingTime / 60;
+    int seconds = remainingTime % 60;
+
+    std::string timeStr = "Time: ";
+    timeStr += (minutes < 10 ? "0" : "") + std::to_string(minutes) + ":";
+    timeStr += (seconds < 10 ? "0" : "") + std::to_string(seconds);
+
+    Color timerColor = Color::GREEN;
+    if (remainingTime < 60) {
+        timerColor = Color::RED;
+    } else if (remainingTime < 120) {
+        timerColor = Color::YELLOW;
+    }
+
+    graphics.drawText(startX + 25, startY - 1, timeStr, timerColor);
+
+    std::string scoreText = "Score: " + std::to_string(_currentScore);
+    graphics.drawText(startX + 40, startY - 1, scoreText, Color::CYAN);
+
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
             int x = startX + j * cellWidth;
             int y = startY + i * cellHeight;
 
-            // Draw cell based on state
             if (_grid[i][j].state == CellState::HIDDEN) {
-                // Highlight cursor position
                 if (i == _cursorRow && j == _cursorCol) {
                     graphics.drawText(x, y, "[#]", Color::CYAN);
                 } else {
@@ -153,7 +238,7 @@ void MinesweeperGame::render(IGraphicsLibrary& graphics)
                 } else {
                     graphics.drawText(x, y, "[F]", Color::RED);
                 }
-            } else { // REVEALED
+            } else {
                 if (_grid[i][j].isMine) {
                     if (i == _cursorRow && j == _cursorCol) {
                         graphics.drawText(x, y, "[*]", Color::CYAN);
@@ -164,7 +249,6 @@ void MinesweeperGame::render(IGraphicsLibrary& graphics)
                     Color numColor;
                     std::string cellContent;
 
-                    // Set color based on number of adjacent mines
                     switch (_grid[i][j].adjacentMines) {
                         case 0: numColor = Color::DEFAULT; cellContent = "   "; break;
                         case 1: numColor = Color::BLUE; cellContent = " 1 "; break;
@@ -187,12 +271,13 @@ void MinesweeperGame::render(IGraphicsLibrary& graphics)
         }
     }
 
-    // Game over / win message
     if (_gameOver) {
         if (_win) {
-            graphics.drawText(startX, startY + _rows * cellHeight + 1, "You Win! Press R to restart", Color::GREEN);
+            std::string winMsg = "You Win! Final Score: " + std::to_string(_currentScore) + " - Press R to restart";
+            graphics.drawText(startX, startY + _rows * cellHeight + 1, winMsg, Color::GREEN);
         } else {
-            graphics.drawText(startX, startY + _rows * cellHeight + 1, "Game Over! Press R to restart", Color::RED);
+            std::string overMsg = "Game Over! Score: " + std::to_string(_currentScore) + " - Press R to restart";
+            graphics.drawText(startX, startY + _rows * cellHeight + 1, overMsg, Color::RED);
         }
     } else {
         graphics.drawText(startX, startY + _rows * cellHeight + 1, "SPACE: Reveal, F: Flag, ESC: Exit, L: Switch graphics, R: Restart game", Color::WHITE);
@@ -201,10 +286,13 @@ void MinesweeperGame::render(IGraphicsLibrary& graphics)
     graphics.refresh();
 }
 
+/**
+ * @brief Handles user input
+ * @param key Key pressed by the user
+ */
 void MinesweeperGame::handleInput(int key)
 {
     if (_gameOver) {
-        // Only handle restart in game over state
         if (key == IGraphicsLibrary::KEY_RESTART_GAME) {
             restart();
         }
@@ -225,38 +313,38 @@ void MinesweeperGame::handleInput(int key)
         case IGraphicsLibrary::KEY_RIGHT_CODE:
             _cursorCol = std::min(_cols - 1, _cursorCol + 1);
             break;
-        case ' ': // Reveal cell
+        case ' ':
             revealCell(_cursorRow, _cursorCol);
             break;
-        case 'f': // Toggle flag
+        case 'f':
         case 'F':
             toggleFlag(_cursorRow, _cursorCol);
             break;
-        case IGraphicsLibrary::KEY_RESTART_GAME: // Restart game
+        case IGraphicsLibrary::KEY_RESTART_GAME:
             restart();
             break;
     }
 }
 
+/**
+ * @brief Reveals a cell and handles game logic
+ * @param row Row of the cell to reveal
+ * @param col Column of the cell to reveal
+ */
 void MinesweeperGame::revealCell(int row, int col)
 {
-    // Bounds check and already revealed check
     if (row < 0 || row >= _rows || col < 0 || col >= _cols ||
         _grid[row][col].state == CellState::REVEALED) {
         return;
     }
 
-    // Can't reveal flagged cells
     if (_grid[row][col].state == CellState::FLAGGED) {
         return;
     }
 
-    // Reveal the cell
     _grid[row][col].state = CellState::REVEALED;
 
-    // Check if mine was hit
     if (_grid[row][col].isMine) {
-        // Reveal all mines
         for (int i = 0; i < _rows; i++) {
             for (int j = 0; j < _cols; j++) {
                 if (_grid[i][j].isMine) {
@@ -268,7 +356,8 @@ void MinesweeperGame::revealCell(int row, int col)
         return;
     }
 
-    // If empty cell (no adjacent mines), reveal neighbors recursively
+    updateScore();
+
     if (_grid[row][col].adjacentMines == 0) {
         for (int di = -1; di <= 1; di++) {
             for (int dj = -1; dj <= 1; dj++) {
@@ -279,15 +368,18 @@ void MinesweeperGame::revealCell(int row, int col)
     }
 }
 
+/**
+ * @brief Toggles a flag on a cell
+ * @param row Row of the cell to toggle
+ * @param col Column of the cell to toggle
+ */
 void MinesweeperGame::toggleFlag(int row, int col)
 {
-    // Bounds check and already revealed check
     if (row < 0 || row >= _rows || col < 0 || col >= _cols ||
         _grid[row][col].state == CellState::REVEALED) {
         return;
     }
 
-    // Toggle flag
     if (_grid[row][col].state == CellState::HIDDEN) {
         _grid[row][col].state = CellState::FLAGGED;
         _flagsUsed++;
@@ -297,9 +389,12 @@ void MinesweeperGame::toggleFlag(int row, int col)
     }
 }
 
+/**
+ * @brief Checks if the win condition is met
+ * @return True if win condition is met, false otherwise
+ */
 bool MinesweeperGame::isWinConditionMet() const
 {
-    // Win condition: all non-mine cells are revealed
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
             if (!_grid[i][j].isMine && _grid[i][j].state != CellState::REVEALED) {
@@ -310,37 +405,48 @@ bool MinesweeperGame::isWinConditionMet() const
     return true;
 }
 
+/**
+ * @brief Checks if the game is over
+ * @return True if the game is over, false otherwise
+ */
 bool MinesweeperGame::isGameOver() const
 {
     return _gameOver;
 }
 
+/**
+ * @brief Cleans up the game state
+ * Currently does nothing, but can be used for future cleanup tasks.
+ */
 void MinesweeperGame::cleanup()
 {
-    // Nothing special to clean up
 }
 
+/**
+ * @brief Returns the current score
+ * @return Current score of the game
+ */
 int MinesweeperGame::getScore() const
 {
-    // Calculate score based on cells revealed
-    int revealedCount = 0;
-
-    for (int i = 0; i < _rows; i++) {
-        for (int j = 0; j < _cols; j++) {
-            if (_grid[i][j].state == CellState::REVEALED && !_grid[i][j].isMine) {
-                revealedCount++;
-            }
-        }
+    if (_win) {
+        return _currentScore;
     }
-
-    return revealedCount * 10; // 10 points per revealed cell
+    return _currentScore;
 }
 
+/**
+ * @brief Returns the name of the game
+ * @return Name of the game
+ */
 std::string MinesweeperGame::getName() const
 {
     return "Minesweeper";
 }
 
+/**
+ * @brief Restarts the game
+ * Resets the game state and reinitializes the grid.
+ */
 void MinesweeperGame::restart()
 {
     initialize();
