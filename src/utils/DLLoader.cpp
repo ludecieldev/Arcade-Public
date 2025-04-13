@@ -10,20 +10,29 @@
 
 namespace arcd {
 
+    /**
+     * @brief Constructor for DLLoader
+     */
     DLLoader::DLLoader() : _handle(nullptr) {}
 
+    /**
+     * @brief Destructor for DLLoader
+     * Ensures any loaded library is properly unloaded
+     */
     DLLoader::~DLLoader() {
         if (_handle) {
             unload();
         }
     }
 
+    /**
+     * @brief Load a dynamic library into memory
+     * @param path path to the library file
+     * @return true if loading was successful, false otherwise
+     */
     bool DLLoader::load(const std::string& path) {
-        // Unload any previously loaded library
         unload();
         
-        
-        // Try to open the library
         _handle = dlopen(path.c_str(), RTLD_LAZY);
         if (!_handle) {
             _error = dlerror();
@@ -33,16 +42,19 @@ namespace arcd {
         return true;
     }
 
+    /**
+     * @brief Get a symbol from the loaded library
+     * @param symbolName name of the symbol to retrieve
+     * @return pointer to the symbol, or nullptr if an error occurred
+     */
     void* DLLoader::getSymbol(const std::string& symbolName) {
         if (!_handle) {
             _error = "No library loaded";
             return nullptr;
         }
         
-        // Clear any existing error
         dlerror();
         
-        // Try to get the symbol
         void* symbol = dlsym(_handle, symbolName.c_str());
         const char* dlsymError = dlerror();
         if (dlsymError) {
@@ -53,6 +65,10 @@ namespace arcd {
         return symbol;
     }
 
+    /**
+     * @brief Unload the currently loaded library
+     * @return true if unloading was successful or no library was loaded, false otherwise
+     */
     bool DLLoader::unload() {
         if (!_handle) {
             return true;
@@ -67,10 +83,18 @@ namespace arcd {
         return true;
     }
 
+    /**
+     * @brief Get the last error message
+     * @return string containing the error message
+     */
     std::string DLLoader::getError() const {
         return _error;
     }
 
+    /**
+     * @brief Check if a library is currently loaded
+     * @return true if a library is loaded, false otherwise
+     */
     bool DLLoader::isLoaded() const {
         return _handle != nullptr;
     }

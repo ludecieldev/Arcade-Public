@@ -71,24 +71,16 @@ void GameManager::initialize()
  */
 bool GameManager::initializeFromLibraryManager(LibraryManager& libManager)
 {
-    // Reset state
     _isPaused = false;
     _lastUpdateTime = std::chrono::high_resolution_clock::now();
     
-    // Check if the LibraryManager has a game
     if (!libManager.hasGameLibrary()) {
         _lastError = "No game loaded in LibraryManager";
         return false;
     }
     
     try {
-        // Get the game from the LibraryManager - we can't directly transfer
-        // the unique_ptr, but we'll call the game's methods through the LibraryManager
-        
-        // Clear our current game first
         _currentGame.reset();
-        
-        // Update the flag
         _isPaused = false;
         return true;
     } catch (const std::exception& e) {

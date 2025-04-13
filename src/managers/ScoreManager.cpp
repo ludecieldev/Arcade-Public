@@ -21,7 +21,6 @@ void ScoreManager::addScore(const std::string& playerName, const std::string& ga
     Score newScore(playerName, gameName, score);
     _scores[gameName].push_back(newScore);
     
-    // Sort scores in descending order
     std::sort(_scores[gameName].begin(), _scores[gameName].end(), 
               [](const Score& a, const Score& b) { return a.value > b.value; });
 }
@@ -36,7 +35,6 @@ std::vector<Score> ScoreManager::getScores(const std::string& gameName) const
     auto it = _scores.find(gameName);
     if (it != _scores.end()) {
         auto scores = it->second;
-        // Sort scores in descending order in case the original ordering was lost
         std::sort(scores.begin(), scores.end(), 
                  [](const Score& a, const Score& b) { return a.value > b.value; });
         return scores;
@@ -53,7 +51,7 @@ Score ScoreManager::getBestScore(const std::string& gameName) const
 {
     auto scores = getScores(gameName);
     if (!scores.empty()) {
-        return scores[0]; // Already sorted in descending order
+        return scores[0];
     }
     return Score("", gameName, 0);
 }
