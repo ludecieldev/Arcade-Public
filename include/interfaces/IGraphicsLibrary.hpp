@@ -51,6 +51,21 @@ class IGraphicsLibrary {
         static constexpr int KEY_RESTART_GAME = 'r';
 
         //=====================================================================
+        // Mouse constants
+        //=====================================================================
+        static constexpr int MOUSE_LEFT_BUTTON = 1;
+        static constexpr int MOUSE_RIGHT_BUTTON = 2;
+        static constexpr int MOUSE_MIDDLE_BUTTON = 3;
+
+        struct MouseEvent {
+            int x;
+            int y;
+            int button;
+            bool pressed;
+            bool hasEvent;
+        };
+
+        //=====================================================================
         // Core functions
         //=====================================================================
 
@@ -92,6 +107,9 @@ class IGraphicsLibrary {
 
         // Input handling - returns standardized key codes
         virtual int getKey() = 0;
+
+        // Mouse input handling - returns mouse information
+        virtual MouseEvent getMouse() = 0;
 
         // Player name management
         virtual void getPlayerName(std::string& playerName) = 0;
