@@ -10,9 +10,10 @@ Welcome to the Arcade project documentation. This collection of documents provid
 4. [Graphics Libraries](GRAPHICS_LIBS.md)
 5. [Game Libraries](GAME_LIBS.md)
 6. [Interfaces](INTERFACES.md)
-7. [Building and Running](BUILDING.md)
-8. [Contributing](CONTRIBUTING.md)
-9. [API Reference](API_REFERENCE.md)
+7. [Library Loading System](LIBRARY_LOADING.md)
+8. [Building and Running](BUILDING.md)
+9. [Contributing](CONTRIBUTING.md)
+10. [API Reference](API_REFERENCE.md)
 
 ## Project Overview
 
@@ -24,10 +25,8 @@ The Arcade project is a modular gaming platform that allows different games to b
 - **Switchable Graphics**: Change the graphical rendering library without restarting the game.
 - **Switchable Games**: Change the current game without restarting the application.
 - **Modular Architecture**: Clearly defined interfaces for each component.
-- **Separation of Concerns**: Graphics libraries handle only rendering, games handle only logic.
-- **Clean Communication**: Core acts as mediator between graphics and game libraries.
-- **Smart Memory Management**: Modern C++ practices with smart pointers.
 - **Cross-Platform**: Works on various operating systems with minimal dependencies.
+- **Crash-Free Library Switching**: Advanced timing and resource management prevents crashes.
 
 ### Project Structure
 
@@ -36,30 +35,10 @@ The Arcade project is a modular gaming platform that allows different games to b
 - **Game Libraries**: Libraries implementing the `IGameLibrary` interface with game logic.
 - **Interfaces**: Shared interfaces and utility classes.
 
-### Separation of Concerns
-
-A key feature of the Arcade project is its strict separation of responsibilities:
-
-- **Graphics Libraries** (SFML, SDL2, Ncurses, etc.)
-  - Handle only visual rendering and user input capture
-  - Pass captured events to the Core without interpretation
-  - Render game state provided by the Core
-  - Contain no game logic
-
-- **Game Libraries** (Snake, etc.)
-  - Implement game rules and logic
-  - Process input events passed from the Core
-  - Maintain and update game state
-  - Contain no rendering code
-
-- **Core**
-  - Acts as mediator between graphics and game libraries
-  - Routes input events from graphics to games
-  - Passes game state from games to graphics for rendering
-  - Manages transitions between states (menu, gameplay, etc.)
-
 ## Getting Started
 
 To start using and understanding the Arcade project, we recommend beginning with the [Architecture Overview](ARCHITECTURE.md) document to get a high-level understanding of how the system works, then dive into specific components based on your interests or needs.
 
-For developers who want to run the project immediately, please refer to the [Building and Running](BUILDING.md) guide. 
+For developers who want to run the project immediately, please refer to the [Building and Running](BUILDING.md) guide.
+
+If you want to understand the advanced library loading system that prevents crashes when switching libraries, check out the [Library Loading System](LIBRARY_LOADING.md) documentation. 

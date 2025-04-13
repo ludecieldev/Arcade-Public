@@ -25,15 +25,17 @@ For the SDL2 graphics library:
 - libsdl2-ttf-dev
 - libsdl2-image-dev
 
-For the SFML graphics library:
-- libsfml-dev (version 3.0 or newer)
+For the Allegro5 graphics library:
+- liballegro5-dev
+- liballegro-ttf5-dev
+- liballegro-primitives5-dev
 
 ### Installing Dependencies on Debian/Ubuntu
 
 ```bash
 # Core dependencies
 sudo apt-get update
-sudo apt-get install build-essential libdl-dev
+sudo apt-get install build-essential libdl-dev cmake
 
 # NCurses
 sudo apt-get install libncurses5-dev
@@ -41,8 +43,8 @@ sudo apt-get install libncurses5-dev
 # SDL2
 sudo apt-get install libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev
 
-# SFML
-sudo apt-get install libsfml-dev
+# Allegro5
+sudo apt-get install liballegro5-dev liballegro-ttf5-dev liballegro-primitives5-dev
 ```
 
 ### Installing Dependencies on Arch/Manjaro
@@ -57,8 +59,8 @@ sudo pacman -S ncurses
 # SDL2
 sudo pacman -S sdl2 sdl2_ttf sdl2_image
 
-# SFML
-sudo pacman -S sfml
+# Allegro5
+sudo pacman -S allegro5 allegro-ttf5 allegro-primitives5
 ```
 
 ## Building the Project
@@ -90,8 +92,8 @@ make graphics_libs
 # Build only game libraries
 make game_libs
 
-# Build a specific graphics library (e.g., SFML)
-make lib/arcade_SFMLGraphics.so
+# Build a specific graphics library (e.g., Allegro5)
+make lib/arcade_Allegro5Graphics.so
 
 # Build a specific game library (e.g., Snake)
 make lib/arcade_SnakeGame.so
@@ -127,9 +129,9 @@ To start the Arcade application with the default graphics library:
 To start with a specific graphics library:
 
 ```bash
-./arcade lib/arcade_NCursesGraphics.so
+./arcade lib/arcade_NcursesGraphics.so
 ./arcade lib/arcade_SDL2Graphics.so
-./arcade lib/arcade_SFMLGraphics.so
+./arcade lib/arcade_Allegro5Graphics.so
 ```
 
 ### Command-Line Arguments
@@ -217,7 +219,7 @@ For graphics-related issues:
 
 - **NCurses**: Ensure your terminal supports color and has the right size
 - **SDL2**: Check if required SDL2 libraries are in the path
-- **SFML**: Verify SFML 3.0 or newer is installed
+- **Allegro5**: Verify Allegro5 is installed
 
 ## Next Steps
 

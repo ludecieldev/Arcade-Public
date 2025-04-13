@@ -12,252 +12,213 @@ Graphics libraries in the Arcade project are responsible for:
 
 Each graphics library implements the same interface (`IGraphicsLibrary`), allowing games to be rendered consistently regardless of which graphics library is active.
 
-## Separation of Concerns
-
-It's important to note that graphics libraries:
-- Should NOT contain any game logic
-- Should NOT make gameplay decisions
-- Should ONLY render what's provided by the Core
-- Should ONLY capture inputs and pass them to the Core without interpretation
-
 ## Available Graphics Libraries
 
 The Arcade project includes several graphics libraries:
 
-| Library | Technology | Features |
-|---------|------------|----------|
-| NCurses | Text-based terminal | Simple, works in terminal environments |
-| SDL2 | Hardware-accelerated 2D | Fast rendering, modern features |
-| SFML | Simple and Fast Multimedia Library | Object-oriented, modern features |
+| Library | Description | Key Features |
+|---------|-------------|--------------|
+| Ncurses | Terminal-based graphics | Lightweight, no dependencies |
+| SDL2 | Simple DirectMedia Layer | Cross-platform, hardware acceleration |
+| SFML | Simple and Fast Multimedia Library | Object-oriented, feature-rich |
+
+## Library Loading and Management
+
+### Loading Process
+
+The loading of graphics libraries follows these critical steps:
+
+1. **Initialization** - The library is loaded via dlopen and symbols are retrieved
+2. **Creation** - The createGraphicsLibrary() function is called to instantiate the library
+3. **Setup** - The library's initialize() method is called to set up resources
+
+### Unloading Process
+
+Unloading libraries follows a careful sequence to prevent crashes:
+
+1. **Cleanup** - Call cleanup() to free resources managed by the library
+2. **Anti-crash delay** - Wait 100ms to ensure resources are fully released
+3. **Unload** - Unload the library with dlclose()
+4. **Final delay** - Wait 50ms to stabilize the system state
+
+### Special Handling for NCurses
+
+NCurses requires special treatment to avoid segmentation faults:
+
+1. **Pointer detachment** - Use `.release()` instead of `reset()` to avoid calling the destructor
+2. **Extended delays** - Use longer delays (150ms) after cleanup
+3. **Resource check** - Special handling in hasGraphicsLibrary() to detect released NCurses instances
+
+```cpp
+// Special handling for NCurses
+if (isNcurses) {
+    _currentGraphicsLib.release(); // Detach pointer without destroying
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+}
+```
+
+### Switching Libraries
+
+When switching between graphics libraries:
+
+1. **State preservation** - Save important state (player name, game state)
+2. **Safe unloading** - Unload current library with proper delay sequence
+3. **Loading** - Load the new library with proper error handling
+4. **Delay** - Wait 50ms before initializing the new library
+5. **State restoration** - Restore saved state to the new library
+
+### Anti-Crash Timing Strategy
+
+The system employs strategic delays to prevent segfaults:
+
+| Operation | Delay | Purpose |
+|-----------|-------|---------|
+| After cleanup() | 100ms | Allow resources to be properly released |
+| Before initialize() | 50ms | Ensure system stability before initialization |
+| After unload | 50ms | Prevent race conditions |
+| NCurses specific | 150ms | Extra time for terminal resources |
 
 ## Graphics Library Interface
 
-All graphics libraries implement the `IGraphicsLibrary` interface:
+All graphics libraries implement the `IGraphicsLibrary` interface defined in `include/interfaces/IGraphicsLibrary.hpp`:
 
 ```cpp
 class IGraphicsLibrary {
 public:
+    // Common key codes
+    static const int KEY_UP_CODE = -1;
+    static const int KEY_DOWN_CODE = -2;
+    static const int KEY_LEFT_CODE = -3;
+    static const int KEY_RIGHT_CODE = -4;
+    static const int KEY_ENTER_CODE = -5;
+    static const int KEY_ESC_CODE = -6;
+    static const int KEY_BACKSPACE_CODE = -7;
+    static const int KEY_NEXT_LIB_CODE = -8;
+    static const int KEY_NEXT_GAME_CODE = -9;
+    
+    // Colors for rendering
+    enum class Color {
+        DEFAULT, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
+    };
+    
     virtual ~IGraphicsLibrary() = default;
     
-    // Lifecycle management
+    // Initialization and cleanup
     virtual bool initialize() = 0;
     virtual void cleanup() = 0;
     
-    // Display management
+    // Display functions
     virtual void clear() = 0;
     virtual void refresh() = 0;
     
-    // Game state rendering
-    virtual void renderGameState(const IGameState& state) = 0;
-    
-    // UI rendering
-    virtual void renderUI(const std::vector<UIElement>& elements) = 0;
+    // Drawing functions
+    virtual void drawText(int x, int y, const std::string& text, Color color = Color::DEFAULT) = 0;
+    virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
+    virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
     
     // Input handling
-    virtual std::optional<std::unique_ptr<IEvent>> pollEvent() = 0;
+    virtual int getKey() = 0;
     
-    // Player interaction
+    // Player name input
     virtual void getPlayerName(std::string& playerName) = 0;
     
-    // Window information
+    // Library information
     virtual std::string getName() const = 0;
+    
+    // Window dimensions
     virtual int getWidth() const = 0;
     virtual int getHeight() const = 0;
 };
 ```
 
-## Event Interface
+## Ncurses Graphics Library Implementation
 
-The `IEvent` interface is used to represent user input in a library-agnostic way:
+The Ncurses graphics library (`NcursesGraphics`) implements the graphics interface using the Ncurses library.
+
+### Features
+- Terminal-based graphics
+- Color support
+- Keyboard input handling
+- Simple text and box drawing
+
+### Special Considerations
+- **Resource Management**: Requires special handling to avoid segfaults when unloading
+- **Terminal Reset**: Needs proper terminal state restoration in cleanup()
+- **Timing**: Needs longer delays when unloading to avoid crashes
+
+## SDL2 Graphics Library Implementation
+
+The SDL2 graphics library (`SDL2Graphics`) implements the graphics interface using the SDL2 library.
+
+### Features
+- Window-based graphics
+- Hardware acceleration
+- TrueType font support
+- Event handling
+- Color management
+
+## SFML Graphics Library Implementation
+
+The SFML graphics library (`SFMLGraphics`) implements the graphics interface using the SFML library.
+
+### Features
+- Object-oriented graphics API
+- Multiple window support
+- Event handling
+- Font rendering
+- Color management
+
+## Memory Management Practices
+
+To ensure stability when loading/unloading libraries, follow these practices:
+
+1. **Resource Cleanup**: Always call cleanup() before unloading
+2. **Strategic Delays**: Use appropriate delays between operations
+3. **Special Cases**: Handle NCurses differently from window-based libraries
+4. **Error Recovery**: Always attempt to restore the previous library if loading fails
+5. **State Preservation**: Save and restore important state when switching libraries
+
+## Troubleshooting Library Loading
+
+### Common Issues
+
+1. **Segmentation Faults**: 
+   - Usually caused by improper unloading sequence
+   - Solution: Use strategic delays and proper cleanup sequence
+
+2. **Resource Leaks**:
+   - Caused by failure to call cleanup() or improper cleanup
+   - Solution: Ensure all resources are freed in cleanup()
+
+3. **NCurses-Specific Crashes**:
+   - Caused by destructor issues with terminal resources
+   - Solution: Use release() instead of reset(), add extra delays
+
+4. **Failed Library Loading**:
+   - Caused by missing dependencies or incompatible libraries
+   - Solution: Verify dependencies, check error messages from dlopen
+
+## Factory Function
+
+Each graphics library provides a factory function for dynamic loading:
 
 ```cpp
-class IEvent {
-public:
-    virtual ~IEvent() = default;
-    
-    virtual EventType getType() const = 0;
-    virtual KeyCode getKeyCode() const = 0;
-    virtual char getCharacter() const = 0;
-    
-    // Mouse event information (if applicable)
-    virtual int getMouseX() const = 0;
-    virtual int getMouseY() const = 0;
-    virtual MouseButton getMouseButton() const = 0;
-};
-```
-
-## Game State Rendering
-
-Graphics libraries render game states provided by the Core:
-
-```cpp
-void NcursesGraphics::renderGameState(const IGameState& state) 
-{
-    // Clear the game area
-    clear();
-    
-    // Draw a border around the game area
-    int width = state.getWidth();
-    int height = state.getHeight();
-    drawBorder(0, 0, width+1, height+1);
-    
-    // Render each entity in the game state
-    for (const auto& entity : state.getEntities()) {
-        int x = entity.x;
-        int y = entity.y;
-        std::string symbol = entity.symbol;
-        Color color = getColorFromName(entity.colorName);
-        
-        // Set the appropriate color
-        attron(COLOR_PAIR(static_cast<int>(color)));
-        
-        // Draw the entity symbol
-        mvprintw(y+1, x+1, "%s", symbol.c_str());
-        
-        // Reset color attributes
-        attroff(COLOR_PAIR(static_cast<int>(color)));
-    }
-    
-    // Draw the score
-    mvprintw(height+2, 1, "Score: %d", state.getScore());
-    
-    // Draw game over message if needed
-    if (state.isGameOver()) {
-        const std::string& message = state.getMessage();
-        int messageX = (width - message.length()) / 2;
-        mvprintw(height/2, messageX+1, "%s", message.c_str());
-    }
-    
-    // Refresh the display
-    refresh();
+extern "C" std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary() {
+    return std::make_unique<arcd::SFMLGraphics>();
 }
 ```
 
-## Input Processing
+## Performance Considerations
 
-Graphics libraries capture input events and convert them to a generic format:
+For optimal performance, graphics libraries:
+- Minimize redrawing when not needed
+- Cache resources where possible
+- Leverage hardware acceleration when available
+- Maintain consistent frame rates
 
-```cpp
-std::optional<std::unique_ptr<IEvent>> SFMLGraphics::pollEvent() 
-{
-    sf::Event sfEvent;
-    if (_window.pollEvent(sfEvent)) {
-        switch (sfEvent.type) {
-            case sf::Event::Closed:
-                return std::make_unique<Event>(EventType::WINDOW_CLOSED);
-                
-            case sf::Event::KeyPressed: {
-                KeyCode keyCode = KeyCode::UNKNOWN;
-                
-                // Map SF::Keyboard keys to our KeyCode enum
-                switch (sfEvent.key.code) {
-                    case sf::Keyboard::Up:    keyCode = KeyCode::UP; break;
-                    case sf::Keyboard::Down:  keyCode = KeyCode::DOWN; break;
-                    case sf::Keyboard::Left:  keyCode = KeyCode::LEFT; break;
-                    case sf::Keyboard::Right: keyCode = KeyCode::RIGHT; break;
-                    case sf::Keyboard::Return: keyCode = KeyCode::ENTER; break;
-                    case sf::Keyboard::Escape: keyCode = KeyCode::ESC; break;
-                    case sf::Keyboard::BackSpace: keyCode = KeyCode::BACKSPACE; break;
-                    case sf::Keyboard::F1: keyCode = KeyCode::NEXT_LIB; break;
-                    case sf::Keyboard::F2: keyCode = KeyCode::NEXT_GAME; break;
-                    case sf::Keyboard::Q: keyCode = KeyCode::QUIT; break;
-                    case sf::Keyboard::R: keyCode = KeyCode::RESTART; break;
-                    default:
-                        // For other keys, we can use their ASCII value
-                        if (sfEvent.key.code >= 0 && sfEvent.key.code < 128) {
-                            return std::make_unique<Event>(
-                                EventType::KEY_PRESSED, 
-                                KeyCode::UNKNOWN,
-                                static_cast<char>(sfEvent.key.code)
-                            );
-                        }
-                        break;
-                }
-                
-                return std::make_unique<Event>(EventType::KEY_PRESSED, keyCode);
-            }
-                
-            case sf::Event::TextEntered:
-                if (sfEvent.text.unicode < 128) {
-                    return std::make_unique<Event>(
-                        EventType::TEXT_ENTERED,
-                        KeyCode::UNKNOWN,
-                        static_cast<char>(sfEvent.text.unicode)
-                    );
-                }
-                break;
-                
-            default:
-                break;
-        }
-    }
-    
-    return std::nullopt; // No event available
-}
-```
+## Next Steps
 
-## UI Rendering
-
-Graphics libraries provide a way to render UI elements like menus and information panels:
-
-```cpp
-void SDLGraphics::renderUI(const std::vector<UIElement>& elements)
-{
-    for (const auto& element : elements) {
-        if (element.type == UIElementType::TEXT) {
-            // Set the color based on selection state
-            SDL_Color color = getSDLColor(element.selected ? Color::YELLOW : element.color);
-            
-            // Render the text
-            renderText(element.x, element.y, element.text, color);
-        }
-        else if (element.type == UIElementType::RECT) {
-            // Create a rectangle
-            SDL_Rect rect = {
-                element.x, element.y, 
-                element.width, element.height
-            };
-            
-            // Set the color
-            SDL_Color color = getSDLColor(element.color);
-            
-            // Draw the rectangle
-            SDL_SetRenderDrawColor(_renderer, color.r, color.g, color.b, color.a);
-            SDL_RenderDrawRect(_renderer, &rect);
-        }
-    }
-}
-```
-
-## Creating a New Graphics Library
-
-To create a new graphics library:
-
-1. Create a class that inherits from `IGraphicsLibrary`
-2. Implement all required methods
-3. Provide a way to manage a window, handle input, and render content
-4. Export the required creation and destruction functions:
-
-```cpp
-extern "C" {
-    std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary() {
-        return std::make_unique<MyGraphicsLib>();
-    }
-    
-    void destroyGraphicsLibrary([[maybe_unused]] arcd::IGraphicsLibrary* graphicsLib) {
-        // With smart pointers, this is not needed anymore
-    }
-}
-```
-
-## Best Practices
-
-When implementing a graphics library:
-
-1. **Performance**: Use efficient rendering techniques
-2. **Resource Management**: Clean up resources properly in the cleanup method
-3. **Error Handling**: Gracefully handle initialization failures and runtime errors
-4. **Input Mapping**: Provide consistent key mappings across libraries
-5. **Separation of Concerns**: Never include game logic in the graphics library
-6. **Adaptability**: Support different screen sizes and aspect ratios
-7. **Fallbacks**: Use sensible defaults when resources are unavailable 
+For more information on related components:
+- [Core Engine Documentation](CORE.md)
+- [Game Libraries Documentation](GAME_LIBS.md)
+- [Interfaces Documentation](INTERFACES.md) 
