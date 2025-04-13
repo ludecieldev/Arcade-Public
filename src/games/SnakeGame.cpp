@@ -82,15 +82,18 @@ void SnakeGame::update()
 
 void SnakeGame::handleInput(int key)
 {
-    // Handle restart when game is over
-    if (_gameOver) {
-        if (key == 'r' || key == 'R') {
-            restart();
-        }
-        return; // Don't handle other inputs when game is over
+    // Handle restart on 'R' key press regardless of game state
+    if (key == 'r' || key == 'R') {
+        restart();
+        return;
     }
     
-    // Only allow 90-degree turns to prevent immediate self-collision
+    // Don't handle other inputs when game is over
+    if (_gameOver) {
+        return;
+    }
+    
+    // Handle movement keys
     switch (key) {
         case IGraphicsLibrary::KEY_UP_CODE:
             if (_direction != Direction::DOWN) {
@@ -111,6 +114,29 @@ void SnakeGame::handleInput(int key)
             if (_direction != Direction::LEFT) {
                 _nextDirection = Direction::RIGHT;
             }
+            break;
+        
+        // The following keys are typically handled by the Core, but we implement 
+        // them here to ensure the game responds correctly if invoked directly
+        case IGraphicsLibrary::KEY_NEXT_LIB_CODE: // '9'
+            // Switch to next graphics library (handled by Core)
+            break;
+            
+        case IGraphicsLibrary::KEY_NEXT_GAME_CODE: // '7'
+            // Switch to next game (handled by Core)
+            break;
+            
+        case 'q':
+        case 'Q':
+        case 'm':
+        case 'M':
+            // Return to menu (handled by Core)
+            break;
+            
+        case 'e':
+        case 'E':
+        case IGraphicsLibrary::KEY_ESC_CODE:
+            // Exit the game (handled by Core)
             break;
     }
 }
@@ -269,6 +295,37 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
         
         // Draw the message
         graphicsLib.drawText(gameOverX, gameOverY, gameOverText, Color::RED);
+    }
+    
+    // Draw controls help
+    std::vector<std::string> controlsInfo = {
+        "Controls:",
+        "Arrows: Move snake",
+        "L: Switch graphics",
+        "G: Change game",
+        "R: Restart game",
+        "Q/M: Back to menu", 
+        "ESC/E: Exit"
+    };
+    
+    int controlsX = startX + BOARD_WIDTH * cellWidth + 4;
+    int controlsY;
+    
+    if (isAllegro) {
+        controlsY = startY;
+        
+        // Display controls with proper spacing for Allegro - Increased spacing between lines 
+        for (size_t i = 0; i < controlsInfo.size(); i++) {
+            // Multiplier 2 to create more space between lines
+            graphicsLib.drawText(controlsX, controlsY + i * cellHeight * 2, controlsInfo[i], Color::CYAN);
+        }
+    } else {
+        controlsY = startY + 1;
+        
+        // Display controls with proper spacing for other libraries
+        for (size_t i = 0; i < controlsInfo.size(); i++) {
+            graphicsLib.drawText(controlsX, controlsY + i, controlsInfo[i], Color::CYAN);
+        }
     }
 }
 

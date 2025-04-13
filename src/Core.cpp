@@ -461,10 +461,12 @@ void Core::handleGameInput(int key)
         
         // Then handle other keys
         switch (key) {
-            case '9': // Use specific key for next graphics library
+            case 'l':
+            case 'L':
                 _libManager->loadNextGraphicsLibrary();
                 break;
-            case '7': // Use specific key for next game
+            case 'g':
+            case 'G':
                 if (_libManager->loadNextGameLibrary()) {
                     if (_libManager->hasGameLibrary()) {
                         // Initialize GameManager with the loaded game from LibraryManager
@@ -483,6 +485,8 @@ void Core::handleGameInput(int key)
                 break;
             case 'q':
             case 'Q':
+            case 'm':
+            case 'M':
                 _state = AppState::MENU;
                 break;
             case 'e':
