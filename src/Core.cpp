@@ -17,6 +17,10 @@ namespace arcd {
 // Variable globale pour suivre quelle option est sélectionnée dans la colonne Player
 int playerOptionSelected = 0;
 
+/**
+ * @brief Constructor for Core
+ * @param initialGraphicsLib Name of the initial graphics library to load
+ */
 Core::Core(const std::string& initialGraphicsLib)
     : _state(AppState::MENU), 
       _selectedMenuOption(0), 
@@ -50,10 +54,18 @@ Core::Core(const std::string& initialGraphicsLib)
     initializeMenu();
 }
 
+/**
+ * @brief Destructor for Core
+ * Cleans up the library manager and game manager
+ */
 Core::~Core() {
     cleanup();
 }
 
+/**
+ * @brief Initializes the core application
+ * @return True if successful, false otherwise
+ */
 bool Core::initialize()
 {
     if (!_libManager->hasGraphicsLibrary()) {
@@ -72,6 +84,9 @@ bool Core::initialize()
     }
 }
 
+/**
+ * @brief Main loop of the application
+ */
 void Core::run()
 {
     if (!_libManager->hasGraphicsLibrary()) {
@@ -201,6 +216,9 @@ void Core::run()
     }
 }
 
+/**
+ * @brief Cleans up the core application
+ */
 void Core::cleanup() {
     // Save scores before exiting
     try {
@@ -232,6 +250,9 @@ void Core::cleanup() {
     _scoreManager.reset();
 }
 
+/**
+ * @brief Initializes the menu options
+ */
 void Core::initializeMenu() {
     _menuOptions = {
         "Select Game",
@@ -242,6 +263,9 @@ void Core::initializeMenu() {
     updateLibraryLists();
 }
 
+/**
+ * @brief Updates the list of available libraries
+ */
 void Core::updateLibraryLists() {
     _gameOptions = _libManager->getGameLibraries();
     _graphicsOptions = _libManager->getGraphicsLibraries();
@@ -274,6 +298,10 @@ void Core::updateLibraryLists() {
     }
 }
 
+/**
+ * @brief Handles keyboard input in the menu
+ * @param key Key pressed by the user
+ */
 void Core::handleMenuInput(int key)
 {
     if (key == IGraphicsLibrary::KEY_ESC_CODE) {
@@ -369,6 +397,10 @@ void Core::handleMenuInput(int key)
     }
 }
 
+/**
+ * @brief Handles keyboard input in the game
+ * @param key Key pressed by the user
+ */
 void Core::handleGameSelectionInput(int key)
 {
     if (key == IGraphicsLibrary::KEY_ESC_CODE) {
@@ -398,6 +430,10 @@ void Core::handleGameSelectionInput(int key)
     }
 }
 
+/**
+ * @brief Handles keyboard input in the graphics selection menu
+ * @param key Key pressed by the user
+ */
 void Core::handleGraphicsSelectionInput(int key)
 {
     if (key == IGraphicsLibrary::KEY_ESC_CODE) {
@@ -431,6 +467,10 @@ void Core::handleGraphicsSelectionInput(int key)
     }
 }
 
+/**
+ * @brief Handles keyboard input in the leaderboard menu
+ * @param key Key pressed by the user
+ */
 void Core::handleLeaderboardInput(int key)
 {
     if (key == IGraphicsLibrary::KEY_ESC_CODE) {
@@ -457,6 +497,9 @@ void Core::handleLeaderboardInput(int key)
     }
 }
 
+/**
+ * @brief Renders the menu
+ */
 void Core::renderMenu() {
     if (!_libManager->hasGraphicsLibrary()) {
         return;
@@ -514,6 +557,10 @@ void Core::renderMenu() {
     }
 }
 
+/**
+ * @brief Handles keyboard input in the game
+ * @param key Key pressed by the user
+ */
 void Core::handleGameInput(int key)
 {
     if (!_libManager->hasGameLibrary()) {
@@ -615,6 +662,9 @@ void Core::handleGameInput(int key)
     }
 }
 
+/**
+ * @brief Renders the game
+ */
 void Core::renderGame() {
     if (!_libManager->hasGraphicsLibrary()) {
         return;
@@ -650,6 +700,9 @@ void Core::renderGame() {
     }
 }
 
+/**
+ * @brief Renders the game selection menu
+ */
 void Core::renderGameSelection()
 {
     if (!_libManager->hasGraphicsLibrary()) {
@@ -709,6 +762,9 @@ void Core::renderGameSelection()
     }
 }
 
+/**
+ * @brief Renders the game selection menu
+ */
 void Core::renderGraphicsSelection()
 {
     if (!_libManager->hasGraphicsLibrary()) {
@@ -768,6 +824,9 @@ void Core::renderGraphicsSelection()
     }
 }
 
+/**
+ * @brief Renders the game selection menu
+ */
 void Core::renderLeaderboard()
 {
     if (!_libManager->hasGraphicsLibrary()) {
@@ -910,15 +969,27 @@ void Core::renderLeaderboard()
     }
 }
 
+/**
+ * @brief Gets the current state of the application
+ * @return Current application state
+ */
 AppState Core::getState() const {
     return _state;
 }
 
+/**
+ * @brief Gets the player name
+ * @return Player name
+ */
 std::vector<std::string> Core::getGameLibraries() const
 {
     return _libManager->getGameLibraries();
 }
 
+/**
+ * @brief Gets the graphics libraries
+ * @return List of graphics libraries
+ */
 std::vector<std::string> Core::getGraphicsLibraries() const
 {
     return _libManager->getGraphicsLibraries();
