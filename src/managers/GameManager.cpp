@@ -9,16 +9,29 @@
 
 namespace arcd {
 
+/**
+ * @brief Constructor for GameManager
+ * @param libDirectory Directory where libraries are located
+ */
 GameManager::GameManager() : _isPaused(false)
 {
     _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
+/**
+ * @brief Destructor for GameManager
+ * Cleans up the current game library if it exists
+ */
 GameManager::~GameManager()
 {
     // Smart pointer will automatically clean up
 }
 
+/**
+ * @brief Sets the current game library
+ * @param game Pointer to the game library to set
+ * @return True if successful, false otherwise
+ */
 bool GameManager::setGame(std::unique_ptr<IGameLibrary> game)
 {
     if (!game) {
@@ -30,6 +43,10 @@ bool GameManager::setGame(std::unique_ptr<IGameLibrary> game)
     return true;
 }
 
+/**
+ * @brief Initializes the game manager
+ * Resets the state and initializes the current game if it exists
+ */
 void GameManager::initialize()
 {
     // Reset state
@@ -47,6 +64,11 @@ void GameManager::initialize()
     }
 }
 
+/**
+ * @brief Initializes the game manager from a LibraryManager
+ * @param libManager Reference to the LibraryManager
+ * @return True if successful, false otherwise
+ */
 bool GameManager::initializeFromLibraryManager(LibraryManager& libManager)
 {
     // Reset state
@@ -76,6 +98,9 @@ bool GameManager::initializeFromLibraryManager(LibraryManager& libManager)
     }
 }
 
+/**
+ * @brief Unloads the current game library
+ */
 IGameLibrary& GameManager::getCurrentGame()
 {
     if (!_currentGame) {
@@ -84,11 +109,19 @@ IGameLibrary& GameManager::getCurrentGame()
     return *_currentGame;
 }
 
+/**
+ * @brief Checks if a game library is currently loaded
+ * @return True if a game library is loaded, false otherwise
+ */
 bool GameManager::hasGame() const
 {
     return _currentGame != nullptr;
 }
 
+/**
+ * @brief Returns the last error message
+ * @return Last error message
+ */
 void GameManager::resetGame()
 {
     if (_currentGame) {
@@ -98,22 +131,35 @@ void GameManager::resetGame()
     }
 }
 
+/**
+ * @brief Pauses the game
+ */
 void GameManager::pauseGame()
 {
     _isPaused = true;
 }
 
+/**
+ * @brief Resumes the game
+ */
 void GameManager::resumeGame()
 {
     _isPaused = false;
     _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
+/**
+ * @brief Checks if the game is paused
+ * @return True if the game is paused, false otherwise
+ */
 bool GameManager::isPaused() const
 {
     return _isPaused;
 }
 
+/**
+ * @brief Updates the game state
+ */
 void GameManager::update()
 {
     if (!_currentGame) {
@@ -123,14 +169,12 @@ void GameManager::update()
     _currentGame->update();
 }
 
+/**
+ * @brief Renders the game
+ * @param graphics Reference to the graphics library
+ */
 void GameManager::render(IGraphicsLibrary& graphics)
 {
-    // When using initializeFromLibraryManager, we don't have our own copy of the game,
-    // so this function needs to handle that case differently.
-    // 
-    // For now, we just do nothing if no local game is available.
-    // Later, we should update the Core to pass the LibraryManager instead so we can
-    // access the game through it.
     if (!_currentGame) {
         return;
     }
@@ -138,11 +182,12 @@ void GameManager::render(IGraphicsLibrary& graphics)
     _currentGame->render(graphics);
 }
 
+/**
+ * @brief Handles input for the game
+ * @param key Key pressed
+ */
 void GameManager::handleInput(int key)
 {
-    // When using initializeFromLibraryManager, we don't have our own copy of the game,
-    // so we do nothing here. The input is handled directly by Core.cpp which passes
-    // the input to the game in LibraryManager.
     if (!_currentGame) {
         return;
     }
@@ -150,6 +195,10 @@ void GameManager::handleInput(int key)
     _currentGame->handleInput(key);
 }
 
+/**
+ * @brief Checks if the game is over
+ * @return True if the game is over, false otherwise
+ */
 bool GameManager::isGameOver() const
 {
     if (!_currentGame) {
@@ -159,6 +208,10 @@ bool GameManager::isGameOver() const
     return _currentGame->isGameOver();
 }
 
+/**
+ * @brief Returns the score of the current game
+ * @return Score of the current game
+ */
 int GameManager::getScore() const
 {
     if (!_currentGame) {
@@ -168,6 +221,10 @@ int GameManager::getScore() const
     return _currentGame->getScore();
 }
 
+/**
+ * @brief Returns the name of the current game
+ * @return Name of the current game
+ */
 std::string GameManager::getName() const
 {
     if (!_currentGame) {
@@ -177,6 +234,10 @@ std::string GameManager::getName() const
     return _currentGame->getName();
 }
 
+/**
+ * @brief Returns the last error message
+ * @return Last error message
+ */
 void GameManager::restart()
 {
     if (!_currentGame) {
