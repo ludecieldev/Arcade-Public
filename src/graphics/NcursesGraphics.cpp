@@ -88,6 +88,9 @@ bool NcursesGraphics::initialize()
     start_color();         // Enable colors
     use_default_colors();  // Use terminal's default colors
     
+    // Activer le support de la souris
+    mousemask(ALL_MOUSE_EVENTS, NULL);
+    
     // Initialize color pairs
     init_pair(1, COLOR_BLACK, -1);
     init_pair(2, COLOR_RED, -1);
@@ -647,7 +650,55 @@ void NcursesGraphics::drawMenu(
 IGraphicsLibrary::MouseEvent NcursesGraphics::getMouse()
 {
     MouseEvent event = {0, 0, 0, false, false};
-
+    
+    if (!_initialized) {
+        return event;
+    }
+    
+    // Activer la souris pour cette session seulement
+    mousemask(ALL_MOUSE_EVENTS, NULL);
+    
+    // Non-blocking check for mouse event
+    int ch = getch();
+    if (ch == KEY_MOUSE) {
+        MEVENT mevent;
+        if (getmouse(&mevent) == OK) {
+            event.x = mevent.x;
+            event.y = mevent.y;
+            event.hasEvent = true;
+            
+            // Déterminer le type de bouton et l'état
+            if (mevent.bstate & BUTTON1_PRESSED) {
+                event.button = MOUSE_LEFT_BUTTON;
+                event.pressed = true;
+            } 
+            else if (mevent.bstate & BUTTON3_PRESSED) {
+                event.button = MOUSE_RIGHT_BUTTON;
+                event.pressed = true;
+            }
+            else if (mevent.bstate & BUTTON2_PRESSED) {
+                event.button = MOUSE_MIDDLE_BUTTON;
+                event.pressed = true;
+            }
+            else if (mevent.bstate & BUTTON1_RELEASED) {
+                event.button = MOUSE_LEFT_BUTTON;
+                event.pressed = false;
+            }
+            else if (mevent.bstate & BUTTON3_RELEASED) {
+                event.button = MOUSE_RIGHT_BUTTON;
+                event.pressed = false;
+            }
+            else if (mevent.bstate & BUTTON2_RELEASED) {
+                event.button = MOUSE_MIDDLE_BUTTON;
+                event.pressed = false;
+            }
+        }
+    }
+    else if (ch != ERR) {
+        // Si c'est un autre type d'événement, le remettre dans le buffer d'entrée
+        ungetch(ch);
+    }
+    
     return event;
 }
 
