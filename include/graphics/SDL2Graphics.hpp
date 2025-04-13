@@ -71,8 +71,7 @@ class SDL2Graphics : public IGraphicsLibrary {
 
         // Input handling
         int getKey() override;
-
-        // Player name input
+        MouseEvent getMouse() override;
         void getPlayerName(std::string& playerName) override;
 
         // Library information
