@@ -8,8 +8,7 @@
 #ifndef I_GAME_LIBRARY_HPP
 #define I_GAME_LIBRARY_HPP
 
-#include "IGameState.hpp"
-#include "IEvent.hpp"
+#include "IGraphicsLibrary.hpp"
 #include <string>
 #include <memory>
 
@@ -21,23 +20,20 @@ public:
 
     // Game lifecycle
     virtual void initialize() = 0;
-    virtual void update(double deltaTime) = 0;
+    virtual void update() = 0;
     virtual void restart() = 0;
     virtual void cleanup() = 0;
 
-    // Input handling - returns true if the event was handled
-    virtual bool processEvent(const IEvent& event) = 0;
+    // Input handling
+    virtual void handleInput(int key) = 0;
 
-    // Game state - the main method to get the current state of the game
-    virtual std::unique_ptr<IGameState> getGameState() const = 0;
+    // Rendering
+    virtual void render(IGraphicsLibrary& graphicsLib) = 0;
 
-    // Game information
-    virtual std::string getName() const = 0;
-    virtual std::string getDescription() const = 0;
-
-    // Game status - for direct query without creating a game state
+    // Game state
     virtual bool isGameOver() const = 0;
     virtual int getScore() const = 0;
+    virtual std::string getName() const = 0;
 };
 
 } // namespace arcd
