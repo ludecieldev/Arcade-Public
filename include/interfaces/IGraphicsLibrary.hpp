@@ -48,12 +48,12 @@ class IGraphicsLibrary {
         static constexpr int KEY_NEXT_GAME_CODE = '7';
         static constexpr int KEY_SPACE_CODE = ' ';
         static constexpr int KEY_TAB_CODE = '\t';
-
+        static constexpr int KEY_RESTART_GAME = 'r';
 
         //=====================================================================
         // Core functions
         //=====================================================================
-        
+
         // Initialization and cleanup
         virtual bool initialize() = 0;
         virtual void cleanup() = 0;
@@ -68,10 +68,10 @@ class IGraphicsLibrary {
         //=====================================================================
         virtual void drawText(int x, int y, const std::string& text, 
                             Color color = Color::DEFAULT) = 0;
-        
+
         virtual void drawBox(int x, int y, int width, int height, 
                            Color color = Color::DEFAULT) = 0;
-        
+
         virtual void drawList(int x, int y, const std::vector<std::string>& items, 
                             int selectedIndex, Color color = Color::DEFAULT) = 0;
 
@@ -89,7 +89,7 @@ class IGraphicsLibrary {
         //=====================================================================
         // Input and state functions
         //=====================================================================
-        
+
         // Input handling - returns standardized key codes
         virtual int getKey() = 0;
 
@@ -104,10 +104,6 @@ class IGraphicsLibrary {
         virtual int getHeight() const = 0;
 };
 
-
-//=============================================================================
-// Dynamic loading interface
-//=============================================================================
 
 // Standard function for creating a unique_ptr to a graphics library
 using create_graphics_t = std::unique_ptr<IGraphicsLibrary> (*)();
