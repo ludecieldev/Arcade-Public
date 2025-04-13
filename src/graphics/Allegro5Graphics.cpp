@@ -123,9 +123,10 @@ void Allegro5Graphics::refresh() {
     al_flip_display();
 }
 
-int Allegro5Graphics::getKey() {
+int Allegro5Graphics::getKey()
+{
     if (!_initialized) return -1;
-
+    
     ALLEGRO_EVENT event;
     while (al_get_next_event(_eventQueue, &event)) {
         if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
@@ -182,6 +183,83 @@ int Allegro5Graphics::getKey() {
         }
     }
     return -1;
+}
+
+IGraphicsLibrary::MouseEvent Allegro5Graphics::getMouse()
+{
+    MouseEvent event = {0, 0, 0, false, false};
+    
+    if (!_initialized) {
+        return event;
+    }
+    
+    ALLEGRO_EVENT allegroEvent;
+    
+    while (al_get_next_event(_eventQueue, &allegroEvent)) {
+        if (allegroEvent.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
+            event.x = allegroEvent.mouse.x;
+            event.y = allegroEvent.mouse.y;
+            event.pressed = true;
+            event.hasEvent = true;
+            
+            // Convertir le bouton Allegro en constantes standardisées
+            switch (allegroEvent.mouse.button) {
+                case 1:
+                    event.button = MOUSE_LEFT_BUTTON;
+                    break;
+                case 2:
+                    event.button = MOUSE_RIGHT_BUTTON;
+                    break;
+                case 3:
+                    event.button = MOUSE_MIDDLE_BUTTON;
+                    break;
+                default:
+                    event.button = 0;
+                    break;
+            }
+            
+            return event;
+        } else if (allegroEvent.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP) {
+            event.x = allegroEvent.mouse.x;
+            event.y = allegroEvent.mouse.y;
+            event.pressed = false;
+            event.hasEvent = true;
+            
+            // Convertir le bouton Allegro en constantes standardisées
+            switch (allegroEvent.mouse.button) {
+                case 1:
+                    event.button = MOUSE_LEFT_BUTTON;
+                    break;
+                case 2:
+                    event.button = MOUSE_RIGHT_BUTTON;
+                    break;
+                case 3:
+                    event.button = MOUSE_MIDDLE_BUTTON;
+                    break;
+                default:
+                    event.button = 0;
+                    break;
+            }
+            
+            return event;
+        }
+        
+        // Si c'est un événement de clavier, on arrête le traitement pour ne pas consommer l'événement
+        if (allegroEvent.type == ALLEGRO_EVENT_KEY_DOWN || 
+            allegroEvent.type == ALLEGRO_EVENT_KEY_UP ||
+            allegroEvent.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
+            // On ne peut pas remettre l'événement dans la file, alors on sauvegarde le code de la touche
+            // pour la prochaine fois qu'on appelle getKey()
+            if (allegroEvent.type == ALLEGRO_EVENT_KEY_DOWN) {
+                _lastKey = allegroEvent.keyboard.keycode;
+            } else if (allegroEvent.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
+                _shouldClose = true;
+            }
+            break;
+        }
+    }
+    
+    return event;
 }
 
 void Allegro5Graphics::getPlayerName(std::string& playerName) {

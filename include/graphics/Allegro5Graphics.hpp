@@ -21,6 +21,7 @@ public:
     void clear() override;
     void refresh() override;
     int getKey() override;
+    MouseEvent getMouse() override;
     void getPlayerName(std::string& playerName) override;
     std::string getName() const override;
     int getWidth() const override;
