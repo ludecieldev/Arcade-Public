@@ -46,6 +46,10 @@ jobs:
           key: ${{ runner.os }}-build-${{ hashFiles('**/lockfiles') }}
           restore-keys: |
             ${{ runner.os }}-build-
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y libcaca-dev
       - name: Build
         run: make
 
