@@ -26,14 +26,13 @@ GAME_LIBS = lib/arcade_snake.so lib/arcade_minesweeper.so
 # Graphicals sources
 GRAPHICALS_SRC = src/graphics/NcursesGraphics.cpp
 GRAPHICALS_SRC += src/graphics/SDL2Graphics.cpp
-GRAPHICALS_SRC += src/graphics/Allegro5Graphics.cpp
 GRAPHICALS_SRC += src/graphics/LibcacaGraphics.cpp
 
-GRAPHICALS_LIBS = lib/arcade_ncurses.so lib/arcade_sdl2.so lib/arcade_allegro5.so lib/arcade_libcaca.so
+GRAPHICALS_LIBS = lib/arcade_ncurses.so lib/arcade_sdl2.so lib/arcade_libcaca.so
 
 CXX = g++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++20 -I./include -fPIC -fno-gnu-unique
-LDFLAGS = -lallegro -lallegro_font -lallegro_ttf -lallegro_primitives -lncurses -lSDL2 -lSDL2_ttf -lcaca
+LDFLAGS = -lncurses -lSDL2 -lSDL2_ttf -lcaca
 
 # Debug flags
 DEBUG_FLAGS = -g3S
@@ -78,11 +77,6 @@ lib/arcade_ncurses.so: src/graphics/NcursesGraphics.cpp
 lib/arcade_sdl2.so: src/graphics/SDL2Graphics.cpp
 	@mkdir -p lib
 	@$(CXX) $(CXXFLAGS) -shared -o $@ $< -lSDL2 -lSDL2_ttf
-	@echo -e "${GREEN}Graphicals library built: $@${NC}"
-
-lib/arcade_allegro5.so: src/graphics/Allegro5Graphics.cpp
-	@mkdir -p lib
-	@$(CXX) $(CXXFLAGS) -shared -o $@ $< -lallegro -lallegro_font -lallegro_ttf -lallegro_primitives
 	@echo -e "${GREEN}Graphicals library built: $@${NC}"
 
 lib/arcade_libcaca.so: src/graphics/LibcacaGraphics.cpp
