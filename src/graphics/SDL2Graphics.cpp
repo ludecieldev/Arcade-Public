@@ -25,6 +25,16 @@ SDL2Graphics::~SDL2Graphics()
     cleanup();
 }
 
+/**
+ * @brief Initialize the graphics library
+ * - Check if already initialized
+ * - Initialize SDL2 and SDL_ttf
+ * - Create window and renderer
+ * - Load required font
+ * - Initialize colors
+ * 
+ * @return true if initialization succeeded, false otherwise
+ */
 bool SDL2Graphics::initialize()
 {
     if (_initialized)
@@ -59,10 +69,8 @@ bool SDL2Graphics::initialize()
         return false;
     }
 
-    // Utiliser uniquement la police Arial du dossier assets
     std::string fontPath = "assets/fonts/Arial.ttf";
     
-    // Vérifier si le fichier existe
     if (!std::filesystem::exists(fontPath)) {
         std::cerr << "Error: Font file not found: " << fontPath << std::endl;
         std::cerr << "SDL2 Graphics library cannot start without this font." << std::endl;
@@ -70,10 +78,9 @@ bool SDL2Graphics::initialize()
         SDL_DestroyWindow(_window);
         TTF_Quit();
         SDL_Quit();
-        exit(84); // Quitter avec le code 84 si la police n'est pas trouvée
+        exit(84);
     }
     
-    // Essayer de charger la police
     _font = TTF_OpenFont(fontPath.c_str(), 16);
     if (!_font) {
         std::cerr << "Error: Failed to load font: " << fontPath << std::endl;
@@ -82,7 +89,7 @@ bool SDL2Graphics::initialize()
         SDL_DestroyWindow(_window);
         TTF_Quit();
         SDL_Quit();
-        exit(84); // Quitter avec le code 84 si la police ne peut pas être chargée
+        exit(84);
     }
 
     initColors();
@@ -90,6 +97,12 @@ bool SDL2Graphics::initialize()
     return true;
 }
 
+/**
+ * @brief Clean up resources used by the graphics library
+ * - Free font resources
+ * - Destroy renderer and window
+ * - Quit SDL_ttf and SDL
+ */
 void SDL2Graphics::cleanup()
 {
     if (_font) {
@@ -109,6 +122,9 @@ void SDL2Graphics::cleanup()
     _initialized = false;
 }
 
+/**
+ * @brief Clear the screen to black
+ */
 void SDL2Graphics::clear()
 {
     if (!_initialized)
@@ -117,6 +133,11 @@ void SDL2Graphics::clear()
     SDL_RenderClear(_renderer);
 }
 
+/**
+ * @brief Refresh the display (swap buffers)
+ * - Present renderer
+ * - Increment frame counter
+ */
 void SDL2Graphics::refresh()
 {
     if (!_initialized)
@@ -125,6 +146,10 @@ void SDL2Graphics::refresh()
     _frameCounter++;
 }
 
+/**
+ * @brief Initialize color mappings for the library
+ * - Map each Color enum value to an SDL_Color
+ */
 void SDL2Graphics::initColors()
 {
     _colors[static_cast<int>(Color::DEFAULT)] = {255, 255, 255, 255};
@@ -137,6 +162,18 @@ void SDL2Graphics::initColors()
     _colors[static_cast<int>(Color::WHITE)] = {255, 255, 255, 255};
 }
 
+/**
+ * @brief Draw text at the specified position
+ * - Create surface from text
+ * - Create texture from surface
+ * - Render texture at specified position
+ * - Clean up resources
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param text the text to draw
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawText(int x, int y, const std::string& text, Color color)
 {
     if (!_initialized || !_font)
@@ -154,8 +191,8 @@ void SDL2Graphics::drawText(int x, int y, const std::string& text, Color color)
     }
 
     SDL_Rect dest;
-    dest.x = x * 10;  // Scale factor for text
-    dest.y = y * 20;  // Scale factor for text
+    dest.x = x * 10;
+    dest.y = y * 20;
     dest.w = surface->w;
     dest.h = surface->h;
 
@@ -165,6 +202,18 @@ void SDL2Graphics::drawText(int x, int y, const std::string& text, Color color)
     SDL_FreeSurface(surface);
 }
 
+/**
+ * @brief Draw a box at the specified position
+ * - Set render draw color based on specified color
+ * - Create rectangle with proper dimensions
+ * - Draw rectangle outline
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param width width of the box
+ * @param height height of the box
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawBox(int x, int y, int width, int height, Color color)
 {
     if (!_initialized)
@@ -182,6 +231,17 @@ void SDL2Graphics::drawBox(int x, int y, int width, int height, Color color)
     SDL_RenderDrawRect(_renderer, &rect);
 }
 
+/**
+ * @brief Draw a list of items with a selected index
+ * - Use different colors for selected and non-selected items
+ * - Draw each item at the appropriate position
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param items vector of strings to display
+ * @param selectedIndex index of the selected item
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color)
 {
     if (!_initialized)
@@ -193,6 +253,14 @@ void SDL2Graphics::drawList(int x, int y, const std::vector<std::string>& items,
     }
 }
 
+/**
+ * @brief Get the last key pressed
+ * - Check if initialized
+ * - Process SDL events
+ * - Map SDL key codes to application key codes
+ * 
+ * @return integer code of the key or 0 if no key pressed
+ */
 int SDL2Graphics::getKey()
 {
     if (!_initialized)
@@ -216,15 +284,12 @@ int SDL2Graphics::getKey()
                 case SDLK_7: return IGraphicsLibrary::KEY_NEXT_GAME_CODE;
                 case SDLK_r: return IGraphicsLibrary::KEY_RESTART_GAME;
                 default: 
-                    // Pour les touches alphabétiques
                     if (event.key.keysym.sym >= SDLK_a && event.key.keysym.sym <= SDLK_z) {
-                        // Gestion spéciale de R/r
                         if (event.key.keysym.sym == SDLK_r) {
                             return IGraphicsLibrary::KEY_RESTART_GAME;
                         }
                         return event.key.keysym.sym;
                     }
-                    // Pour les touches numériques
                     else if (event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9) {
                         return event.key.keysym.sym;
                     }
@@ -235,6 +300,15 @@ int SDL2Graphics::getKey()
     return 0;
 }
 
+/**
+ * @brief Get the player's name via user input
+ * - Display prompt for player name
+ * - Process keyboard events
+ * - Handle backspace, enter, and escape keys
+ * - Handle regular character input
+ * 
+ * @param playerName reference to string to store the player name
+ */
 void SDL2Graphics::getPlayerName(std::string& playerName)
 {
     if (!_initialized)
@@ -273,11 +347,37 @@ void SDL2Graphics::getPlayerName(std::string& playerName)
     }
 }
 
+/**
+ * @brief Get the name of the graphics library
+ * 
+ * @return name of the graphics library
+ */
 std::string SDL2Graphics::getName() const
 {
     return "SDL2";
 }
 
+/**
+ * @brief Draw the menu screen
+ * - Clear the screen
+ * - Draw centered title
+ * - Calculate positions for menu boxes
+ * - Process game and graphics library names for display
+ * - Draw game options box and items
+ * - Draw graphics options box and items
+ * - Draw player options box and items
+ * - Draw instructions box with controls
+ * - Refresh the display
+ * 
+ * @param title title of the menu
+ * @param gameOptions list of game options
+ * @param graphicOptions list of graphic library options
+ * @param playerName name of the player
+ * @param selectedMenu selected menu section
+ * @param selectedGameIndex selected game index
+ * @param selectedGraphicIndex selected graphics library index
+ * @param playerOptionSelected selected player option index
+ */
 void SDL2Graphics::drawMenu(
     const std::string& title,
     const std::vector<std::string>& gameOptions,
@@ -292,27 +392,22 @@ void SDL2Graphics::drawMenu(
     
     clear();
     
-    // Draw centered title
     drawTextCentered(3, title, Color::WHITE);
     
-    // Calculate positions for menu boxes
-    int boxWidth = 25; // Augmenter la largeur
-    int boxHeight = 15; // Augmenter la hauteur
+    int boxWidth = 25;
+    int boxHeight = 15;
     int spacing = 4;
     int totalWidth = 3 * boxWidth + 2 * spacing;
     int startX = (_width - totalWidth) / 2;
     int startY = 8;
     
-    // Préparer les noms simplifiés
     std::vector<std::string> displayGameNames;
     for (const auto& name : gameOptions) {
         std::string displayName = name;
-        // Enlever le préfixe "arcade_" s'il existe
         size_t prefixPos = displayName.find("arcade_");
         if (prefixPos != std::string::npos) {
-            displayName = displayName.substr(prefixPos + 7); // 7 est la longueur de "arcade_"
+            displayName = displayName.substr(prefixPos + 7);
         }
-        // Enlever l'extension ".so" s'il existe
         size_t extPos = displayName.find(".so");
         if (extPos != std::string::npos) {
             displayName = displayName.substr(0, extPos);
@@ -323,12 +418,10 @@ void SDL2Graphics::drawMenu(
     std::vector<std::string> displayGraphicNames;
     for (const auto& name : graphicOptions) {
         std::string displayName = name;
-        // Enlever le préfixe "arcade_" s'il existe
         size_t prefixPos = displayName.find("arcade_");
         if (prefixPos != std::string::npos) {
-            displayName = displayName.substr(prefixPos + 7); // 7 est la longueur de "arcade_"
+            displayName = displayName.substr(prefixPos + 7);
         }
-        // Enlever l'extension ".so" s'il existe
         size_t extPos = displayName.find(".so");
         if (extPos != std::string::npos) {
             displayName = displayName.substr(0, extPos);
@@ -336,24 +429,20 @@ void SDL2Graphics::drawMenu(
         displayGraphicNames.push_back(displayName);
     }
     
-    // Draw game options box
     bool isGameBoxSelected = (selectedMenu == 0);
     Color gameBoxColor = isGameBoxSelected ? Color::YELLOW : Color::WHITE;
     drawBoxWithTitle(startX, startY, boxWidth, boxHeight, "Games", gameBoxColor);
     
-    // Draw game options
     for (size_t i = 0; i < displayGameNames.size() && i < static_cast<size_t>(boxHeight - 3); i++) {
         Color itemColor = (isGameBoxSelected && static_cast<int>(i) == selectedGameIndex) 
                           ? Color::YELLOW : Color::WHITE;
         drawText(startX + 2, startY + 3 + static_cast<int>(i), displayGameNames[i], itemColor);
     }
     
-    // Draw graphics options box
     bool isGraphicsBoxSelected = (selectedMenu == 1);
     Color graphicsBoxColor = isGraphicsBoxSelected ? Color::YELLOW : Color::WHITE;
     drawBoxWithTitle(startX + boxWidth + spacing, startY, boxWidth, boxHeight, "Graphics", graphicsBoxColor);
     
-    // Draw graphics options
     for (size_t i = 0; i < displayGraphicNames.size() && i < static_cast<size_t>(boxHeight - 3); i++) {
         Color itemColor = (isGraphicsBoxSelected && static_cast<int>(i) == selectedGraphicIndex) 
                           ? Color::YELLOW : Color::WHITE;
@@ -361,12 +450,10 @@ void SDL2Graphics::drawMenu(
                 displayGraphicNames[i], itemColor);
     }
     
-    // Draw player name box
     bool isPlayerBoxSelected = (selectedMenu == 2);
     Color playerBoxColor = isPlayerBoxSelected ? Color::YELLOW : Color::WHITE;
     drawBoxWithTitle(startX + 2 * (boxWidth + spacing), startY, boxWidth, boxHeight, "Player: " + playerName, playerBoxColor);
     
-    // Draw player options
     std::vector<std::string> playerOptions = {"Change Nickname", "Leaderboard"};
     for (size_t i = 0; i < playerOptions.size(); i++) {
         Color itemColor = (isPlayerBoxSelected && static_cast<int>(i) == playerOptionSelected) 
@@ -375,13 +462,10 @@ void SDL2Graphics::drawMenu(
                 playerOptions[i], itemColor);
     }
     
-    // Draw instructions with clear spacing
     int instructionY = startY + boxHeight + 2;
     
-    // Augmenter la hauteur de la boîte d'instructions
-    const int instructionBoxHeight = 180; // Augmentation significative
+    const int instructionBoxHeight = 180;
 
-    // Draw instruction box with increased size
     SDL_SetRenderDrawColor(_renderer, 50, 50, 50, 150);
     SDL_Rect instructionBox = {
         static_cast<int>((startX - 2) * 10), 
@@ -391,7 +475,6 @@ void SDL2Graphics::drawMenu(
     };
     SDL_RenderFillRect(_renderer, &instructionBox);
     
-    // Draw instructions with spacing
     std::vector<std::pair<std::string, std::string>> instructions = {
         {"SELECT", "Use TAB to switch boxes"},
         {"NAVIGATE", "Use ARROWS to navigate"},
@@ -399,12 +482,10 @@ void SDL2Graphics::drawMenu(
         {"EXIT", "Press ESC to exit"}
     };
     
-    // Augmenter l'espacement vertical entre les instructions
-    const int instructionSpacing = 3; // Augmenter l'espacement vertical
+    const int instructionSpacing = 3;
     
     for (size_t i = 0; i < instructions.size(); i++) {
         int y = instructionY + 1 + i * instructionSpacing;
-        // Utiliser drawText pour les labels au lieu de drawBoldText
         drawText(startX + 2, y, instructions[i].first + ":", Color::YELLOW);
         drawText(startX + 12, y, instructions[i].second, Color::WHITE);
     }
@@ -412,6 +493,18 @@ void SDL2Graphics::drawMenu(
     refresh();
 }
 
+/**
+ * @brief Draw text centered horizontally at the specified y position
+ * - Create surface from text
+ * - Create texture from surface
+ * - Calculate horizontal center position
+ * - Render texture at centered position
+ * - Clean up resources
+ * 
+ * @param y y-coordinate
+ * @param text the text to draw
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawTextCentered(int y, const std::string& text, Color color)
 {
     if (!_initialized || !_font)
@@ -432,8 +525,8 @@ void SDL2Graphics::drawTextCentered(int y, const std::string& text, Color color)
     int screen_width;
     SDL_GetRendererOutputSize(_renderer, &screen_width, nullptr);
     
-    dest.x = (screen_width - surface->w) / 2;  // Center horizontally
-    dest.y = y * 20;  // Scale factor for text
+    dest.x = (screen_width - surface->w) / 2;
+    dest.y = y * 20;
     dest.w = surface->w;
     dest.h = surface->h;
 
@@ -443,15 +536,27 @@ void SDL2Graphics::drawTextCentered(int y, const std::string& text, Color color)
     SDL_FreeSurface(surface);
 }
 
+/**
+ * @brief Draw a box with a title
+ * - Draw the box outline
+ * - Create text surface and texture
+ * - Calculate position to center title
+ * - Render title
+ * - Clean up resources
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param width width of the box
+ * @param height height of the box
+ * @param title title text for the box
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawBoxWithTitle(int x, int y, int width, int height, const std::string& title, Color color)
 {
     if (!_initialized)
         return;
-
-    // Draw the box
     drawBox(x, y, width, height, color);
     
-    // Draw the title centered
     if (_font && !title.empty()) {
         SDL_Color sdlColor = _colors[static_cast<int>(color)];
         SDL_Surface* surface = TTF_RenderText_Blended(_font, title.c_str(), sdlColor);
@@ -459,8 +564,8 @@ void SDL2Graphics::drawBoxWithTitle(int x, int y, int width, int height, const s
             SDL_Texture* texture = SDL_CreateTextureFromSurface(_renderer, surface);
             if (texture) {
                 SDL_Rect dest;
-                dest.x = (x * 10) + ((width * 10) - surface->w) / 2;  // Center in box
-                dest.y = (y * 20) + 10;  // Near top of box
+                dest.x = (x * 10) + ((width * 10) - surface->w) / 2;
+                dest.y = (y * 20) + 10;
                 dest.w = surface->w;
                 dest.h = surface->h;
                 
@@ -472,6 +577,19 @@ void SDL2Graphics::drawBoxWithTitle(int x, int y, int width, int height, const s
     }
 }
 
+/**
+ * @brief Draw a filled box
+ * - Set render draw color based on specified color
+ * - Create rectangle with proper dimensions
+ * - Fill the rectangle
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param width width of the box
+ * @param height height of the box
+ * @param fillChar character to fill the box with (unused in SDL implementation)
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawFilledBox(int x, int y, int width, int height, [[maybe_unused]] char fillChar, Color color)
 {
     if (!_initialized)
@@ -489,6 +607,16 @@ void SDL2Graphics::drawFilledBox(int x, int y, int width, int height, [[maybe_un
     SDL_RenderFillRect(_renderer, &rect);
 }
 
+/**
+ * @brief Draw a horizontal line
+ * - Set render draw color based on specified color
+ * - Draw line from start position with specified width
+ * 
+ * @param x x-coordinate of start
+ * @param y y-coordinate
+ * @param width length of the line
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawHorizontalLine(int x, int y, int width, Color color)
 {
     if (!_initialized)
@@ -500,6 +628,16 @@ void SDL2Graphics::drawHorizontalLine(int x, int y, int width, Color color)
     SDL_RenderDrawLine(_renderer, x * 10, y * 20, (x + width) * 10, y * 20);
 }
 
+/**
+ * @brief Draw a vertical line
+ * - Set render draw color based on specified color
+ * - Draw line from start position with specified height
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate of start
+ * @param height height of the line
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawVerticalLine(int x, int y, int height, Color color)
 {
     if (!_initialized)
@@ -511,20 +649,30 @@ void SDL2Graphics::drawVerticalLine(int x, int y, int height, Color color)
     SDL_RenderDrawLine(_renderer, x * 10, y * 20, x * 10, (y + height) * 20);
 }
 
+/**
+ * @brief Draw a progress bar
+ * - Draw the border
+ * - Calculate the fill width based on value and maximum
+ * - Set render draw color
+ * - Fill the progress bar to appropriate level
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param width width of the progress bar
+ * @param value current value
+ * @param maxValue maximum value
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawProgressBar(int x, int y, int width, int value, int maxValue, Color color)
 {
     if (!_initialized)
         return;
-
-    // Draw the border
     drawBox(x, y, width, 1, color);
     
-    // Calculate the fill width
     int fillWidth = (width - 2) * value / maxValue;
     if (fillWidth < 0) fillWidth = 0;
     if (fillWidth > width - 2) fillWidth = width - 2;
     
-    // Draw the fill
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
     SDL_SetRenderDrawColor(_renderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a);
     
@@ -532,18 +680,28 @@ void SDL2Graphics::drawProgressBar(int x, int y, int width, int value, int maxVa
     fillRect.x = (x + 1) * 10;
     fillRect.y = y * 20 + 2;
     fillRect.w = fillWidth * 10;
-    fillRect.h = 16;  // Slightly less than the height of the box
+    fillRect.h = 16;
     
     SDL_RenderFillRect(_renderer, &fillRect);
 }
 
+/**
+ * @brief Draw bold text at the specified position
+ * - Create surface from text
+ * - Create texture from surface
+ * - Render texture at specified position
+ * - Clean up resources
+ * 
+ * @param x x-coordinate
+ * @param y y-coordinate
+ * @param text the text to draw
+ * @param color color to use for drawing
+ */
 void SDL2Graphics::drawBoldText(int x, int y, const std::string& text, Color color)
 {
     if (!_initialized || !_font)
         return;
 
-    // Utiliser uniquement un simple drawText avec la couleur demandée
-    // au lieu de dessiner le texte deux fois qui cause l'effet de doublon
     SDL_Color sdlColor = _colors[static_cast<int>(color)];
     SDL_Surface* surface = TTF_RenderText_Blended(_font, text.c_str(), sdlColor);
     if (!surface)
@@ -573,11 +731,5 @@ extern "C" {
     std::unique_ptr<arcd::IGraphicsLibrary> createGraphicsLibrary()
     {
         return std::make_unique<arcd::SDL2Graphics>();
-    }
-
-    void destroyGraphicsLibrary([[maybe_unused]] arcd::IGraphicsLibrary* graphicsLib)
-    {
-        // With smart pointers, this function is not needed anymore
-        // but we keep it for compatibility
     }
 } 

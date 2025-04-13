@@ -16,9 +16,16 @@ SnakeGame::SnakeGame()
     initialize();
 }
 
+/**
+ * @brief Initialize the game state
+ * - Reset game state
+ * - Create initial snake in the middle of the board
+ * - Create the snake extending to the left (since we'll move right)
+ * - Spawn initial food
+ * - Reset timer
+ */
 void SnakeGame::initialize()
 {
-    // Reset game state
     _gameOver = false;
     _exitRequested = false;
     _score = 0;
@@ -26,71 +33,75 @@ void SnakeGame::initialize()
     _nextDirection = Direction::RIGHT;
     _snake.clear();
     
-    // Create initial snake in the middle of the board
     int startX = BOARD_WIDTH / 2 - INITIAL_SNAKE_LENGTH;
     int startY = BOARD_HEIGHT / 2;
     
-    // Create the snake extending to the left (since we'll move right)
     for (int i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
-        _snake.push_front({startX + i, startY}); // Snake starts moving right
+        _snake.push_front({startX + i, startY});
     }
     
-    // Spawn initial food
     spawnFood();
     
-    // Reset timer
     _lastUpdateTime = std::chrono::high_resolution_clock::now();
 }
 
+/**
+ * @brief Update the game state
+ * - Check if enough time has passed for update
+ * - Update snake direction
+ * - Move the snake
+ * - Check for food collision
+ * - Check for collisions with walls and self
+ * - Reset timer
+ */
 void SnakeGame::update()
 {
     if (_gameOver) {
         return;
     }
     
-    // Check if enough time has passed since the last update
     auto currentTime = std::chrono::high_resolution_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
         currentTime - _lastUpdateTime).count();
     
     if (elapsedTime < UPDATE_INTERVAL_MS) {
-        return; // Not time to update yet
+        return;
     }
     
-    // Update the direction
     _direction = _nextDirection;
     
-    // Move the snake
     moveSnake();
     
-    // Check for food collision
     if (_snake.front().x == _food.x && _snake.front().y == _food.y) {
-        // Don't remove the tail segment, effectively growing the snake
         _score += 10;
         spawnFood();
     } else {
-        // Remove the tail segment to maintain the same length
         _snake.pop_back();
     }
     
-    // Check for collisions with walls and self
     if (checkCollision(_snake.front())) {
         _gameOver = true;
     }
     
-    // Reset timer
     _lastUpdateTime = currentTime;
 }
 
+/**
+ * @brief Handle input from the user
+ * - Handle restart on 'R' key press regardless of game state
+ * - In game over screen, allow quitting to menu
+ * - Handle movement keys based on current direction
+ * - Handle special keys for library and game switching
+ * 
+ * @param key Key code from the input system
+ */
 void SnakeGame::handleInput(int key)
 {
-    // Handle restart on 'R' key press regardless of game state
     if (key == 'r' || key == 'R') {
         restart();
         return;
     }
     
-    // Dans l'écran de game over, permettre de quitter au menu
     if (_gameOver) {
         if (key == 'm' || key == 'M' || key == 'q' || key == 'Q' || key == IGraphicsLibrary::KEY_ESC_CODE) {
             _exitRequested = true;
@@ -98,7 +109,6 @@ void SnakeGame::handleInput(int key)
         return;
     }
     
-    // Handle movement keys
     switch (key) {
         case IGraphicsLibrary::KEY_UP_CODE:
             if (_direction != Direction::DOWN) {
@@ -121,68 +131,73 @@ void SnakeGame::handleInput(int key)
             }
             break;
         
-        // The following keys are typically handled by the Core, but we implement 
-        // them here to ensure the game responds correctly if invoked directly
-        case IGraphicsLibrary::KEY_NEXT_LIB_CODE: // '9'
-            // Switch to next graphics library (handled by Core)
+        case IGraphicsLibrary::KEY_NEXT_LIB_CODE:
             break;
             
-        case IGraphicsLibrary::KEY_NEXT_GAME_CODE: // '7'
-            // Switch to next game (handled by Core)
+        case IGraphicsLibrary::KEY_NEXT_GAME_CODE:
             break;
             
         case 'e':
         case 'E':
         case IGraphicsLibrary::KEY_ESC_CODE:
-            // Exit the game (handled by Core)
             break;
     }
 }
 
+/**
+ * @brief Render the game on screen
+ * - Get screen dimensions
+ * - Determine cell size based on graphics library
+ * - Calculate position to center the board on screen
+ * - Draw all game elements (board, snake, food, info)
+ * 
+ * @param graphicsLib Graphics library to use for rendering
+ */
 void SnakeGame::render(IGraphicsLibrary& graphicsLib)
 {
-    // Get the screen dimensions
     int screenWidth = graphicsLib.getWidth();
     int screenHeight = graphicsLib.getHeight();
     
-    // Determine cell size based on the graphics library type and window size
     int cellWidth = 2;
     int cellHeight = 1;
     
-    // Special handling for Allegro5
     bool isAllegro = (graphicsLib.getName() == "Allegro5");
     
     if (isAllegro) {
-        // For Allegro, we need larger cell sizes
         cellWidth = 15;
         cellHeight = 15;
-    } else if (screenWidth < 80) { // For very small displays with other libraries
+    } else if (screenWidth < 80) {
         cellWidth = 1;
     }
     
-    // Calculate position to center the board on screen
     int startX = (screenWidth - BOARD_WIDTH * cellWidth) / 2;
     int startY = (screenHeight - BOARD_HEIGHT * cellHeight) / 2;
     
-    // For Allegro, adjust the Y position to account for font size differences
     if (isAllegro) {
         startY = (screenHeight - BOARD_HEIGHT * cellHeight) / 3;
     }
     
-    // Make sure the board fits on screen
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
     
-    // Draw the game elements
     drawBoard(graphicsLib, startX, startY, cellWidth, cellHeight);
     drawSnake(graphicsLib, startX, startY, cellWidth, cellHeight);
     drawFood(graphicsLib, startX, startY, cellWidth, cellHeight);
     drawInfo(graphicsLib, startX, startY, cellWidth, cellHeight);
 }
 
+/**
+ * @brief Draw the game board
+ * - Draw the border box around the play area
+ * 
+ * @param graphicsLib Graphics library to use for rendering
+ * @param startX Starting X position of the board
+ * @param startY Starting Y position of the board
+ * @param cellWidth Width of each cell
+ * @param cellHeight Height of each cell
+ */
 void SnakeGame::drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    // Draw the border box
     graphicsLib.drawBox(
         startX - 1, 
         startY - 1, 
@@ -190,11 +205,20 @@ void SnakeGame::drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY,
         BOARD_HEIGHT * cellHeight + 2, 
         Color::CYAN
     );
-    
-    // For SDL2 and other graphics libraries, we'll use a minimal approach
-    // for the board background - empty cells are just blank
 }
 
+/**
+ * @brief Draw the snake on the board
+ * - Draw the snake head with a different character
+ * - Draw each snake body segment
+ * - Adjust drawing based on graphics library
+ * 
+ * @param graphicsLib Graphics library to use for rendering
+ * @param startX Starting X position of the board
+ * @param startY Starting Y position of the board
+ * @param cellWidth Width of each cell
+ * @param cellHeight Height of each cell
+ */
 void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
     bool isAllegro = (graphicsLib.getName() == "Allegro5");
@@ -203,16 +227,12 @@ void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY,
         return;
     }
     
-    // Draw the snake head
     Position head = _snake.front();
-    // Use simpler characters for better compatibility
     std::string headChar = "O";
     
-    // For Allegro, we need to adjust the y-coordinate for each segment
     if (isAllegro) {
         graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y * cellHeight, headChar, Color::YELLOW);
         
-        // Draw the snake body
         for (size_t i = 1; i < _snake.size(); i++) {
             Position segment = _snake[i];
             std::string bodyChar = "o";
@@ -221,7 +241,6 @@ void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY,
     } else {
         graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y, headChar, Color::YELLOW);
         
-        // Draw the snake body
         for (size_t i = 1; i < _snake.size(); i++) {
             Position segment = _snake[i];
             std::string bodyChar = "o";
@@ -230,11 +249,21 @@ void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY,
     }
 }
 
+/**
+ * @brief Draw the food on the board
+ * - Draw the food with a special character
+ * - Adjust drawing based on graphics library
+ * 
+ * @param graphicsLib Graphics library to use for rendering
+ * @param startX Starting X position of the board
+ * @param startY Starting Y position of the board
+ * @param cellWidth Width of each cell
+ * @param cellHeight Height of each cell
+ */
 void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
     bool isAllegro = (graphicsLib.getName() == "Allegro5");
     
-    // Use simpler characters for better compatibility
     std::string foodChar = "*";
     
     if (isAllegro) {
@@ -244,36 +273,43 @@ void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, 
     }
 }
 
+/**
+ * @brief Draw game information and UI elements
+ * - Draw score box
+ * - Draw game over message if applicable
+ * - Draw game controls help
+ * - Adjust drawing based on graphics library
+ * 
+ * @param graphicsLib Graphics library to use for rendering
+ * @param startX Starting X position of the board
+ * @param startY Starting Y position of the board
+ * @param cellWidth Width of each cell
+ * @param cellHeight Height of each cell
+ */
 void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
     bool isAllegro = (graphicsLib.getName() == "Allegro5");
     
-    // Draw a box for the score
     int scoreBoxWidth = 20;
     int scoreBoxX = startX + (BOARD_WIDTH * cellWidth - scoreBoxWidth) / 2;
     int scoreBoxY;
     
     if (isAllegro) {
-        // Pour Allegro, position the score above the board with more space
         scoreBoxY = startY - cellHeight * 3;
         graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, cellHeight, Color::WHITE);
         
-        // Draw the score
         std::string scoreText = "Score: " + std::to_string(_score);
-        int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length() * 8) / 2; // Adjust for text width in Allegro
+        int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length() * 8) / 2;
         graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
     } else {
-        // For other libraries
         scoreBoxY = startY - 3;
         graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, 1, Color::WHITE);
         
-        // Draw the score
         std::string scoreText = "Score: " + std::to_string(_score);
         int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length()) / 2;
         graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
     }
     
-    // Draw game over message if applicable
     if (_gameOver) {
         std::string gameOverText = "Game Over!";
         std::string restartText = "Press R to restart";
@@ -282,34 +318,26 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
         int gameOverY;
         
         if (isAllegro) {
-            // Pour Allegro, centre le message "Game Over" dans le plateau
             gameOverY = startY + (BOARD_HEIGHT * cellHeight) / 2 - cellHeight;
-            // Draw box around game over message - adjust size for Allegro
             graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, cellHeight * 3, Color::RED);
             
-            // Draw the message
             int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length() * 8) / 2;
             graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
             
-            // Draw restart instruction
             int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length() * 8) / 2;
             graphicsLib.drawText(restartX, gameOverY + cellHeight, restartText, Color::RED);
         } else {
-            // Pour les autres bibliothèques, centre le message "Game Over" dans le plateau
             gameOverY = startY + BOARD_HEIGHT / 2;
             graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
             
-            // Draw the message
             int textX = startX + (BOARD_WIDTH * cellWidth - gameOverText.length()) / 2;
             graphicsLib.drawText(textX, gameOverY, gameOverText, Color::RED);
             
-            // Draw restart instruction
             int restartX = startX + (BOARD_WIDTH * cellWidth - restartText.length()) / 2;
             graphicsLib.drawText(restartX, gameOverY + 1, restartText, Color::RED);
         }
     }
     
-    // Draw controls help
     std::vector<std::string> controlsInfo = {
         "Controls:",
         "Arrows: Move snake",
@@ -328,32 +356,32 @@ void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, 
     if (isAllegro) {
         controlsY = startY;
         
-        // Display controls with proper spacing for Allegro - Increased spacing between lines 
         for (size_t i = 0; i < controlsInfo.size(); i++) {
-            // Multiplier 2 to create more space between lines
             graphicsLib.drawText(controlsX, controlsY + i * cellHeight * 2, controlsInfo[i], Color::CYAN);
         }
     } else {
         controlsY = startY + 1;
         
-        // Display controls with proper spacing for other libraries
         for (size_t i = 0; i < controlsInfo.size(); i++) {
             graphicsLib.drawText(controlsX, controlsY + i, controlsInfo[i], Color::CYAN);
         }
     }
 }
 
+/**
+ * @brief Move the snake in the current direction
+ * - Get current head position
+ * - Calculate new head position based on direction
+ * - Add new head to the front of the snake
+ */
 void SnakeGame::moveSnake()
 {
-    // Ensure the snake is not empty
     if (_snake.empty()) {
         return;
     }
     
-    // Get current head position
     Position newHead = _snake.front();
     
-    // Calculate new head position based on direction
     switch (_direction) {
         case Direction::UP:
             newHead.y--;
@@ -369,20 +397,25 @@ void SnakeGame::moveSnake()
             break;
     }
     
-    // Add new head to the front of the snake
     _snake.push_front(newHead);
 }
 
+/**
+ * @brief Check if there is a collision at the given position
+ * - Check for collisions with walls
+ * - Check for self collision (skip the head)
+ * 
+ * @param pos Position to check for collision
+ * @return true if there is a collision, false otherwise
+ */
 bool SnakeGame::checkCollision(const Position& pos)
 {
-    // Vérifier les collisions avec les murs
     if (pos.x < 0 || pos.x >= BOARD_WIDTH || pos.y < 0 || pos.y >= BOARD_HEIGHT) {
         return true;
     }
     
-    // Check for self collision (skip the head)
     auto it = _snake.begin();
-    ++it; // Skip the head since we're checking if the head collides with the body
+    ++it;
     
     for (; it != _snake.end(); ++it) {
         if (pos.x == it->x && pos.y == it->y) {
@@ -393,13 +426,17 @@ bool SnakeGame::checkCollision(const Position& pos)
     return false;
 }
 
+/**
+ * @brief Spawn food at a random position
+ * - Create distributions for random positions
+ * - Try to find a position that doesn't overlap with the snake
+ * - Keep generating positions until a valid one is found
+ */
 void SnakeGame::spawnFood()
 {
-    // Create distributions for random positions
     std::uniform_int_distribution<int> distX(0, BOARD_WIDTH - 1);
     std::uniform_int_distribution<int> distY(0, BOARD_HEIGHT - 1);
     
-    // Try to find a position that doesn't overlap with the snake
     bool validPosition = false;
     
     while (!validPosition) {
@@ -408,7 +445,6 @@ void SnakeGame::spawnFood()
         
         validPosition = true;
         
-        // Check if the food spawned on the snake
         for (const auto& segment : _snake) {
             if (_food.x == segment.x && _food.y == segment.y) {
                 validPosition = false;
@@ -418,26 +454,48 @@ void SnakeGame::spawnFood()
     }
 }
 
+/**
+ * @brief Restart the game
+ * - Call initialize to reset the game state
+ */
 void SnakeGame::restart()
 {
     initialize();
 }
 
+/**
+ * @brief Clean up resources
+ * - No resources to clean up in this implementation
+ */
 void SnakeGame::cleanup()
 {
-    // No resources to clean up
 }
 
+/**
+ * @brief Check if the game is over
+ * 
+ * @return true if the game is over or exit requested, false otherwise
+ */
 bool SnakeGame::isGameOver() const
 {
     return _gameOver || _exitRequested;
 }
 
+/**
+ * @brief Get the current score
+ * 
+ * @return Current score
+ */
 int SnakeGame::getScore() const
 {
     return _score;
 }
 
+/**
+ * @brief Get the name of the game
+ * 
+ * @return Name of the game
+ */
 std::string SnakeGame::getName() const
 {
     return "Snake";
@@ -451,7 +509,5 @@ extern "C" {
     }
     
     void destroyGameLibrary([[maybe_unused]] arcd::IGameLibrary* gameLib) {
-        // With smart pointers, this function is not needed anymore
-        // but we keep it for compatibility
     }
 } 
