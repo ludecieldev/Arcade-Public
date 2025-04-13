@@ -280,10 +280,9 @@ void Core::handleMenuInput(int key)
         return;
     }
     
-    // 'L' key for direct access to leaderboard
+    // 'L' key to switch graphics library
     if (key == 'l' || key == 'L') {
-        _state = AppState::LEADERBOARD;
-        _selectedLeaderboardGame = 0; // Start with the first game
+        _libManager->loadNextGraphicsLibrary();
         return;
     }
     
@@ -438,6 +437,12 @@ void Core::handleLeaderboardInput(int key)
         return;
     }
     
+    // Allow switching graphics library with 'L'
+    if (key == 'l' || key == 'L') {
+        _libManager->loadNextGraphicsLibrary();
+        return;
+    }
+    
     // Navigation between games
     if (key == IGraphicsLibrary::KEY_LEFT_CODE) {
         if (!_gameOptions.empty()) {
@@ -491,15 +496,6 @@ void Core::renderMenu() {
         // Créer un titre pour le menu principal
         std::string menuTitle = "ARCADE";
         
-        // Personnaliser les options de la colonne Player
-        // Construire un vecteur d'options pour la colonne Player
-        std::vector<std::string> playerOptions;
-        playerOptions.push_back(playerOptionSelected == 0 ? "Nickname" : "  Nickname");
-        playerOptions.push_back(playerOptionSelected == 1 ? "Leaderboard" : "  Leaderboard");
-        
-        // Construire une seule chaîne avec saut de ligne pour l'affichage
-        std::string playerDisplay = playerOptions[0] + "\n" + playerOptions[1];
-        
         // Use the standardized menu drawing method
         graphicsLib.drawMenu(
             menuTitle,
@@ -508,27 +504,9 @@ void Core::renderMenu() {
             _playerName, // Utiliser le nom du joueur comme identifiant standard
             _selectedMenuOption,
             _selectedGameIndex,
-            _selectedGraphicsIndex
+            _selectedGraphicsIndex,
+            playerOptionSelected
         );
-        
-        // Afficher manuellement les options de la colonne Player
-        int width = graphicsLib.getWidth();
-        int height = graphicsLib.getHeight();
-        
-        // Position approximative de la colonne Player
-        int playerColX = width * 3 / 4;
-        int playerColY = height / 3;
-        
-        // Dessiner le titre de la colonne
-        std::string playerTitle = "Player: " + _playerName;
-        int playerTitleX = playerColX - playerTitle.length() / 2;
-        graphicsLib.drawText(playerTitleX, playerColY - 3, playerTitle, Color::CYAN);
-        
-        // Dessiner les options
-        for (size_t i = 0; i < playerOptions.size(); i++) {
-            graphicsLib.drawText(playerColX - 5, playerColY + i, playerOptions[i], 
-                              (i == (size_t)playerOptionSelected) ? Color::GREEN : Color::WHITE);
-        }
         
     } catch (const std::exception& e) {
         std::cerr << "Error rendering menu: " << e.what() << std::endl;
