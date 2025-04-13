@@ -83,7 +83,8 @@ class IGraphicsLibrary {
             const std::string& playerName,
             int selectedMenu,
             int selectedGameIndex,
-            int selectedGraphicIndex) = 0;
+            int selectedGraphicIndex,
+            int playerOptionSelected = 0) = 0;
 
 
         //=====================================================================
