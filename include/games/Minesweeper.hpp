@@ -5,6 +5,7 @@
 #include "../interfaces/IGraphicsLibrary.hpp"
 #include <vector>
 #include <string>
+#include <chrono>
 
 namespace arcd {
 
@@ -26,6 +27,12 @@ private:
     int _flagsUsed;
     int _cursorRow;
     int _cursorCol;
+    int _currentScore;
+
+    // Timer related members
+    std::chrono::steady_clock::time_point _startTime;
+    std::chrono::seconds _maxTime;
+    bool _timerStarted;
 
     // Helper methods
     void initializeGrid();
@@ -34,6 +41,8 @@ private:
     void revealCell(int row, int col);
     void toggleFlag(int row, int col);
     bool isWinConditionMet() const;
+    int getRemainingTimeSeconds() const;
+    void updateScore();
 
 public:
     MinesweeperGame();
