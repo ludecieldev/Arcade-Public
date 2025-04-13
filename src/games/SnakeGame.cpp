@@ -121,18 +121,29 @@ void SnakeGame::render(IGraphicsLibrary& graphicsLib)
     int screenWidth = graphicsLib.getWidth();
     int screenHeight = graphicsLib.getHeight();
     
-    // Determine cell size based on the graphics library window size
-    // For smaller windows, use smaller cells
+    // Determine cell size based on the graphics library type and window size
     int cellWidth = 2;
     int cellHeight = 1;
     
-    if (screenWidth < 80) { // For very small displays
+    // Special handling for Allegro5
+    bool isAllegro = (graphicsLib.getName() == "Allegro5");
+    
+    if (isAllegro) {
+        // For Allegro, we need larger cell sizes
+        cellWidth = 15;
+        cellHeight = 15;
+    } else if (screenWidth < 80) { // For very small displays with other libraries
         cellWidth = 1;
     }
     
     // Calculate position to center the board on screen
     int startX = (screenWidth - BOARD_WIDTH * cellWidth) / 2;
-    int startY = (screenHeight - BOARD_HEIGHT) / 2;
+    int startY = (screenHeight - BOARD_HEIGHT * cellHeight) / 2;
+    
+    // For Allegro, adjust the Y position to account for font size differences
+    if (isAllegro) {
+        startY = (screenHeight - BOARD_HEIGHT * cellHeight) / 3;
+    }
     
     // Make sure the board fits on screen
     if (startX < 0) startX = 0;
@@ -162,7 +173,7 @@ void SnakeGame::drawBoard(IGraphicsLibrary& graphicsLib, int startX, int startY,
 
 void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    (void)cellHeight; // Avoid unused parameter warning
+    bool isAllegro = (graphicsLib.getName() == "Allegro5");
     
     if (_snake.empty()) {
         return;
@@ -172,49 +183,89 @@ void SnakeGame::drawSnake(IGraphicsLibrary& graphicsLib, int startX, int startY,
     Position head = _snake.front();
     // Use simpler characters for better compatibility
     std::string headChar = "O";
-    graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y, headChar, Color::YELLOW);
     
-    // Draw the snake body
-    for (size_t i = 1; i < _snake.size(); i++) {
-        Position segment = _snake[i];
-        // Use simpler characters for better compatibility
-        std::string bodyChar = "o";
-        graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y, bodyChar, Color::GREEN);
+    // For Allegro, we need to adjust the y-coordinate for each segment
+    if (isAllegro) {
+        graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y * cellHeight, headChar, Color::YELLOW);
+        
+        // Draw the snake body
+        for (size_t i = 1; i < _snake.size(); i++) {
+            Position segment = _snake[i];
+            std::string bodyChar = "o";
+            graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y * cellHeight, bodyChar, Color::GREEN);
+        }
+    } else {
+        graphicsLib.drawText(startX + head.x * cellWidth, startY + head.y, headChar, Color::YELLOW);
+        
+        // Draw the snake body
+        for (size_t i = 1; i < _snake.size(); i++) {
+            Position segment = _snake[i];
+            std::string bodyChar = "o";
+            graphicsLib.drawText(startX + segment.x * cellWidth, startY + segment.y, bodyChar, Color::GREEN);
+        }
     }
 }
 
 void SnakeGame::drawFood(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    (void)cellHeight; // Avoid unused parameter warning
+    bool isAllegro = (graphicsLib.getName() == "Allegro5");
     
     // Use simpler characters for better compatibility
     std::string foodChar = "*";
-    graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y, foodChar, Color::RED);
+    
+    if (isAllegro) {
+        graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y * cellHeight, foodChar, Color::RED);
+    } else {
+        graphicsLib.drawText(startX + _food.x * cellWidth, startY + _food.y, foodChar, Color::RED);
+    }
 }
 
 void SnakeGame::drawInfo(IGraphicsLibrary& graphicsLib, int startX, int startY, int cellWidth, int cellHeight)
 {
-    (void)cellHeight; // Avoid unused parameter warning
+    bool isAllegro = (graphicsLib.getName() == "Allegro5");
     
     // Draw a box for the score
     int scoreBoxWidth = 20;
     int scoreBoxX = startX + (BOARD_WIDTH * cellWidth - scoreBoxWidth) / 2;
-    graphicsLib.drawBox(scoreBoxX - 1, startY - 3, scoreBoxWidth, 1, Color::WHITE);
+    int scoreBoxY;
     
-    // Draw the score
-    std::string scoreText = "Score: " + std::to_string(_score);
-    int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length()) / 2;
-    graphicsLib.drawText(scoreX, startY - 3, scoreText, Color::WHITE);
+    if (isAllegro) {
+        // For Allegro, position the score above the board with more space
+        scoreBoxY = startY - cellHeight * 3;
+        graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, cellHeight, Color::WHITE);
+        
+        // Draw the score
+        std::string scoreText = "Score: " + std::to_string(_score);
+        int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length() * 8) / 2; // Adjust for text width in Allegro
+        graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
+    } else {
+        // For other libraries
+        scoreBoxY = startY - 3;
+        graphicsLib.drawBox(scoreBoxX - 1, scoreBoxY, scoreBoxWidth, 1, Color::WHITE);
+        
+        // Draw the score
+        std::string scoreText = "Score: " + std::to_string(_score);
+        int scoreX = startX + (BOARD_WIDTH * cellWidth - scoreText.length()) / 2;
+        graphicsLib.drawText(scoreX, scoreBoxY, scoreText, Color::WHITE);
+    }
     
     // Draw game over message if applicable
     if (_gameOver) {
         std::string gameOverText = "Game Over! Press 'R' to restart";
         int gameOverBoxWidth = gameOverText.length() + 4;
         int gameOverX = startX + (BOARD_WIDTH * cellWidth - gameOverBoxWidth) / 2;
-        int gameOverY = startY + BOARD_HEIGHT + 3;
+        int gameOverY;
         
-        // Draw box around game over message
-        graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
+        if (isAllegro) {
+            // For Allegro, position the game over message below the board with more space
+            gameOverY = startY + BOARD_HEIGHT * cellHeight + cellHeight * 2;
+            // Draw box around game over message - adjust size for Allegro
+            graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, cellHeight * 2, Color::RED);
+        } else {
+            // For other libraries
+            gameOverY = startY + BOARD_HEIGHT + 3;
+            graphicsLib.drawBox(gameOverX - 2, gameOverY - 1, gameOverBoxWidth, 3, Color::RED);
+        }
         
         // Draw the message
         graphicsLib.drawText(gameOverX, gameOverY, gameOverText, Color::RED);
