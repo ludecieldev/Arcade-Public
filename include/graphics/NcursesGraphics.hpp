@@ -17,8 +17,23 @@
 #include <optional>
 #include <functional>
 #include <ncurses.h>
+#include <memory>
 
 namespace arcd {
+
+/**
+ * @brief Destructeur personnalisé pour les fenêtres Ncurses
+ */
+struct WindowDeleter {
+    void operator()(WINDOW* w) { 
+        if (w) delwin(w); 
+    }
+};
+
+/**
+ * @brief Type personnalisé pour les smart pointers de fenêtres Ncurses
+ */
+using WindowPtr = std::unique_ptr<WINDOW, WindowDeleter>;
 
 /**
  * @brief Helper for mapping between game colors and ANSI terminal colors
@@ -95,6 +110,153 @@ class NcursesGraphics : public IGraphicsLibrary {
          * @brief Optional reference to the core system
          */
         std::optional<std::reference_wrapper<Core>> _core;
+
+        // Encapsulation des fonctions C natives de ncurses
+        /**
+         * @brief Encapsule l'initialisation de ncurses
+         */
+        void ncursesInit();
+        
+        /**
+         * @brief Encapsule la fermeture de ncurses
+         */
+        void ncursesEnd();
+        
+        /**
+         * @brief Encapsule la configuration du mode raw
+         */
+        void ncursesRaw();
+        
+        /**
+         * @brief Encapsule la désactivation de l'echo
+         */
+        void ncursesNoEcho();
+        
+        /**
+         * @brief Encapsule l'activation de l'echo
+         */
+        void ncursesEcho();
+        
+        /**
+         * @brief Encapsule la configuration du curseur
+         * @param visibility niveau de visibilité du curseur (0=invisible, 1=normal, 2=très visible)
+         */
+        void ncursesSetCursor(int visibility);
+        
+        /**
+         * @brief Encapsule la configuration du clavier
+         * @param window fenêtre pour laquelle configurer le clavier
+         * @param enable true pour activer, false pour désactiver
+         */
+        void ncursesKeypad(WINDOW* window, bool enable);
+        
+        /**
+         * @brief Encapsule la configuration du mode nodelay
+         * @param window fenêtre pour laquelle configurer le mode
+         * @param enable true pour activer, false pour désactiver
+         */
+        void ncursesNodelay(WINDOW* window, bool enable);
+        
+        /**
+         * @brief Encapsule l'initialisation des couleurs
+         */
+        void ncursesStartColor();
+        
+        /**
+         * @brief Encapsule l'utilisation des couleurs par défaut
+         */
+        void ncursesUseDefaultColors();
+        
+        /**
+         * @brief Encapsule l'initialisation d'une paire de couleurs
+         * @param pairIndex index de la paire à initialiser
+         * @param foreground couleur d'avant-plan
+         * @param background couleur d'arrière-plan
+         */
+        void ncursesInitPair(int pairIndex, int foreground, int background);
+        
+        /**
+         * @brief Encapsule la récupération des dimensions de l'écran
+         * @param win fenêtre dont on veut les dimensions
+         * @param height référence pour stocker la hauteur
+         * @param width référence pour stocker la largeur
+         */
+        void ncursesGetMaxYX(WINDOW* win, int& height, int& width);
+        
+        /**
+         * @brief Encapsule l'activation d'un attribut
+         * @param attrs attributs à activer
+         */
+        void ncursesAttron(int attrs);
+        
+        /**
+         * @brief Encapsule la désactivation d'un attribut
+         * @param attrs attributs à désactiver
+         */
+        void ncursesAttroff(int attrs);
+        
+        /**
+         * @brief Encapsule l'affichage d'une chaîne à une position donnée
+         * @param y position verticale
+         * @param x position horizontale
+         * @param str chaîne à afficher
+         */
+        void ncursesAddstr(int y, int x, const std::string& str);
+        
+        /**
+         * @brief Encapsule l'affichage d'une chaîne formatée à une position donnée
+         * @param y position verticale
+         * @param x position horizontale
+         * @param format chaîne de format
+         * @param args arguments variables
+         */
+        template<typename... Args>
+        void ncursesAddstr(int y, int x, const char* format, Args... args)
+        {
+            mvprintw(y, x, format, args...);
+        }
+        
+        /**
+         * @brief Encapsule l'affichage formaté
+         * @param y position verticale
+         * @param x position horizontale
+         * @param format chaîne de format
+         * @param args arguments variables
+         */
+        template<typename... Args>
+        void ncursesPrintw(int y, int x, const char* format, Args... args)
+        {
+            mvprintw(y, x, format, args...);
+        }
+        
+        /**
+         * @brief Encapsule le déplacement du curseur
+         * @param y position verticale
+         * @param x position horizontale
+         */
+        void ncursesMove(int y, int x);
+        
+        /**
+         * @brief Encapsule la récupération d'une touche
+         * @return code de la touche ou ERR si aucune touche
+         */
+        int ncursesGetch();
+        
+        /**
+         * @brief Encapsule la configuration du timeout
+         * @param delay délai en millisecondes
+         */
+        void ncursesTimeout(int delay);
+        
+        /**
+         * @brief Encapsule le vidage du buffer d'entrée
+         */
+        void ncursesFlushInput();
+        
+        /**
+         * @brief Encapsule l'effacement de l'écran
+         */
+        void ncursesErase();
 
         /**
          * @brief Update terminal size information

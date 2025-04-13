@@ -60,13 +60,94 @@ NcursesGraphics::~NcursesGraphics()
     cleanup();
 }
 
+// Implémentation des méthodes d'encapsulation
+void NcursesGraphics::ncursesInit() {
+    initscr();
+}
+
+void NcursesGraphics::ncursesEnd() {
+    endwin();
+}
+
+void NcursesGraphics::ncursesRaw() {
+    raw();
+}
+
+void NcursesGraphics::ncursesNoEcho() {
+    noecho();
+}
+
+void NcursesGraphics::ncursesEcho() {
+    echo();
+}
+
+void NcursesGraphics::ncursesSetCursor(int visibility) {
+    curs_set(visibility);
+}
+
+void NcursesGraphics::ncursesKeypad(WINDOW* window, bool enable) {
+    keypad(window, enable ? TRUE : FALSE);
+}
+
+void NcursesGraphics::ncursesNodelay(WINDOW* window, bool enable) {
+    nodelay(window, enable ? TRUE : FALSE);
+}
+
+void NcursesGraphics::ncursesStartColor() {
+    start_color();
+}
+
+void NcursesGraphics::ncursesUseDefaultColors() {
+    use_default_colors();
+}
+
+void NcursesGraphics::ncursesInitPair(int pairIndex, int foreground, int background) {
+    init_pair(pairIndex, foreground, background);
+}
+
+void NcursesGraphics::ncursesGetMaxYX(WINDOW* win, int& height, int& width) {
+    getmaxyx(win, height, width);
+}
+
+void NcursesGraphics::ncursesAttron(int attrs) {
+    attron(attrs);
+}
+
+void NcursesGraphics::ncursesAttroff(int attrs) {
+    attroff(attrs);
+}
+
+void NcursesGraphics::ncursesAddstr(int y, int x, const std::string& str) {
+    mvaddstr(y, x, str.c_str());
+}
+
+void NcursesGraphics::ncursesMove(int y, int x) {
+    move(y, x);
+}
+
+int NcursesGraphics::ncursesGetch() {
+    return getch();
+}
+
+void NcursesGraphics::ncursesTimeout(int delay) {
+    timeout(delay);
+}
+
+void NcursesGraphics::ncursesFlushInput() {
+    flushinp();
+}
+
+void NcursesGraphics::ncursesErase() {
+    erase();
+}
+
 /**
  * @brief Update the terminal dimensions
  * - Get terminal size from ncurses
  */
 void NcursesGraphics::updateTerminalSize() {
     if (!_initialized) return;
-    getmaxyx(stdscr, _height, _width);
+    ncursesGetMaxYX(stdscr, _height, _width);
 }
 
 /**
@@ -90,23 +171,23 @@ bool NcursesGraphics::initialize()
     }
     
     setlocale(LC_ALL, "");
-    initscr();
-    raw();
-    noecho();
-    curs_set(0);
-    keypad(stdscr, TRUE);
-    nodelay(stdscr, TRUE);
-    start_color();
-    use_default_colors();
+    ncursesInit();
+    ncursesRaw();
+    ncursesNoEcho();
+    ncursesSetCursor(0);
+    ncursesKeypad(stdscr, true);
+    ncursesNodelay(stdscr, true);
+    ncursesStartColor();
+    ncursesUseDefaultColors();
     
-    init_pair(1, COLOR_BLACK, -1);
-    init_pair(2, COLOR_RED, -1);
-    init_pair(3, COLOR_GREEN, -1);
-    init_pair(4, COLOR_YELLOW, -1);
-    init_pair(5, COLOR_BLUE, -1);
-    init_pair(6, COLOR_MAGENTA, -1);
-    init_pair(7, COLOR_CYAN, -1);
-    init_pair(8, COLOR_WHITE, -1);
+    ncursesInitPair(1, COLOR_BLACK, -1);
+    ncursesInitPair(2, COLOR_RED, -1);
+    ncursesInitPair(3, COLOR_GREEN, -1);
+    ncursesInitPair(4, COLOR_YELLOW, -1);
+    ncursesInitPair(5, COLOR_BLUE, -1);
+    ncursesInitPair(6, COLOR_MAGENTA, -1);
+    ncursesInitPair(7, COLOR_CYAN, -1);
+    ncursesInitPair(8, COLOR_WHITE, -1);
     
     updateTerminalSize();
     
@@ -129,13 +210,13 @@ void NcursesGraphics::cleanup()
     clear();
     refresh();
     
-    keypad(stdscr, FALSE);
+    ncursesKeypad(stdscr, false);
     nocbreak();
-    echo();
+    ncursesEcho();
     
-    endwin();
+    ncursesEnd();
     
-    curs_set(1);
+    ncursesSetCursor(1);
     
     _initialized = false;
     _width = 80;
@@ -151,7 +232,7 @@ void NcursesGraphics::cleanup()
 void NcursesGraphics::clear()
 {
     if (!_initialized) return;
-    erase();
+    ncursesErase();
 }
 
 /**
@@ -180,9 +261,9 @@ void NcursesGraphics::refresh()
 void NcursesGraphics::drawText(int x, int y, const std::string& text, Color color)
 {
     if (!_initialized) return;
-    attron(COLOR_PAIR(static_cast<int>(color)));
-    mvaddstr(y, x, text.c_str());
-    attroff(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAddstr(y, x, text);
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
 /**
@@ -218,24 +299,24 @@ void NcursesGraphics::drawBox(int x, int y, int width, int height, Color color)
 {
     if (!_initialized) return;
     
-    attron(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
     
-    mvaddstr(y, x, "┌");
-    mvaddstr(y, x + width - 1, "┐");
-    mvaddstr(y + height - 1, x, "└");
-    mvaddstr(y + height - 1, x + width - 1, "┘");
+    ncursesAddstr(y, x, "┌");
+    ncursesAddstr(y, x + width - 1, "┐");
+    ncursesAddstr(y + height - 1, x, "└");
+    ncursesAddstr(y + height - 1, x + width - 1, "┘");
     
     for (int i = x + 1; i < x + width - 1; i++) {
-        mvaddstr(y, i, "─");
-        mvaddstr(y + height - 1, i, "─");
+        ncursesAddstr(y, i, "─");
+        ncursesAddstr(y + height - 1, i, "─");
     }
     
     for (int i = y + 1; i < y + height - 1; i++) {
-        mvaddstr(i, x, "│");
-        mvaddstr(i, x + width - 1, "│");
+        ncursesAddstr(i, x, "│");
+        ncursesAddstr(i, x + width - 1, "│");
     }
     
-    attroff(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
 /**
@@ -273,13 +354,13 @@ void NcursesGraphics::drawBoxWithTitle(int x, int y, int width, int height, cons
  */
 void NcursesGraphics::drawFilledBox(int x, int y, int width, int height, char fillChar, Color color) {
     if (!_initialized) return;
-    attron(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
-            mvprintw(y + i, x + j, "%c", fillChar);
+            ncursesPrintw(y + i, x + j, "%c", fillChar);
         }
     }
-    attroff(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
 /**
@@ -295,11 +376,11 @@ void NcursesGraphics::drawFilledBox(int x, int y, int width, int height, char fi
  */
 void NcursesGraphics::drawHorizontalLine(int x, int y, int length, Color color) {
     if (!_initialized) return;
-    attron(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
     for (int i = 0; i < length; i++) {
-        mvprintw(y, x + i, "─");
+        ncursesPrintw(y, x + i, "─");
     }
-    attroff(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
 /**
@@ -315,11 +396,11 @@ void NcursesGraphics::drawHorizontalLine(int x, int y, int length, Color color) 
  */
 void NcursesGraphics::drawVerticalLine(int x, int y, int height, Color color) {
     if (!_initialized) return;
-    attron(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
     for (int i = 0; i < height; i++) {
-        mvprintw(y + i, x, "│");
+        ncursesPrintw(y + i, x, "│");
     }
-    attroff(COLOR_PAIR(static_cast<int>(color)));
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
 /**
@@ -340,15 +421,15 @@ void NcursesGraphics::drawList(int x, int y, const std::vector<std::string>& ite
     
     for (size_t i = 0; i < items.size(); i++) {
         if (static_cast<int>(i) == selectedIndex) {
-            attron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
-            mvaddstr(y + i, x, "> ");
-            mvaddstr(y + i, x + 2, items[i].c_str());
-            attroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+            ncursesAttron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+            ncursesAddstr(y + i, x, "> ");
+            ncursesAddstr(y + i, x + 2, items[i]);
+            ncursesAttroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
         } else {
-            attron(COLOR_PAIR(static_cast<int>(color)));
-            mvaddstr(y + i, x, "  ");
-            mvaddstr(y + i, x + 2, items[i].c_str());
-            attroff(COLOR_PAIR(static_cast<int>(color)));
+            ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
+            ncursesAddstr(y + i, x, "  ");
+            ncursesAddstr(y + i, x + 2, items[i]);
+            ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
         }
     }
 }
@@ -380,47 +461,54 @@ void NcursesGraphics::getPlayerName(std::string& playerName)
     
     drawBox(startX, startY, boxWidth, boxHeight, Color::WHITE);
     
-    curs_set(1);
-    echo();
+    ncursesSetCursor(1);
+    ncursesEcho();
     
     int inputX = startX + 2;
     int inputY = startY + 1;
-    move(inputY, inputX);
+    ncursesMove(inputY, inputX);
     refresh();
     
     char input[256];
     memset(input, 0, sizeof(input));
     
-    WINDOW* inputWin = newwin(1, boxWidth - 4, inputY, inputX);
-    keypad(inputWin, TRUE);
+    // Création d'une fenêtre Ncurses avec WindowPtr
+    WindowPtr inputWin(newwin(1, boxWidth - 4, inputY, inputX));
+    if (!inputWin) {
+        ncursesNoEcho();
+        ncursesSetCursor(0);
+        return;
+    }
+    
+    ncursesKeypad(inputWin.get(), true);
     
     int ch;
     int pos = 0;
-    while ((ch = wgetch(inputWin)) != '\n' && ch != KEY_ENTER && ch != KEY_ESC_CODE) {
+    while ((ch = wgetch(inputWin.get())) != '\n' && ch != KEY_ENTER && ch != KEY_ESC_CODE) {
         if (ch == KEY_BACKSPACE || ch == 127) {
             if (pos > 0) {
                 pos--;
                 input[pos] = '\0';
-                mvwaddch(inputWin, 0, pos, ' ');
-                wmove(inputWin, 0, pos);
-                wrefresh(inputWin);
+                mvwaddch(inputWin.get(), 0, pos, ' ');
+                wmove(inputWin.get(), 0, pos);
+                wrefresh(inputWin.get());
             }
         } else if (pos < static_cast<int>(sizeof(input) - 1) && isprint(ch)) {
             input[pos] = ch;
             pos++;
             input[pos] = '\0';
         }
-        wrefresh(inputWin);
+        wrefresh(inputWin.get());
     }
     
-    noecho();
-    curs_set(0);
+    ncursesNoEcho();
+    ncursesSetCursor(0);
     
     if (pos > 0) {
         playerName = input;
     }
     
-    delwin(inputWin);
+    // Le destructeur du WindowPtr va automatiquement appeler delwin
     clear();
     refresh();
 }
@@ -437,7 +525,7 @@ int NcursesGraphics::getKey()
 {
     if (!_initialized) return 0;
     
-    int ch = getch();
+    int ch = ncursesGetch();
     if (ch == ERR) return 0;
     
     switch (ch) {
@@ -463,7 +551,7 @@ int NcursesGraphics::getKey()
 void NcursesGraphics::flushInputBuffer()
 {
     if (!_initialized) return;
-    flushinp();
+    ncursesFlushInput();
 }
 
 /**
@@ -475,17 +563,17 @@ void NcursesGraphics::initColors()
 {
     if (!_initialized) return;
     
-    use_default_colors();
+    ncursesUseDefaultColors();
     
-    init_pair(static_cast<int>(Color::DEFAULT), -1, -1);
-    init_pair(static_cast<int>(Color::BLACK), COLOR_BLACK, -1);
-    init_pair(static_cast<int>(Color::RED), COLOR_RED, -1);
-    init_pair(static_cast<int>(Color::GREEN), COLOR_GREEN, -1);
-    init_pair(static_cast<int>(Color::YELLOW), COLOR_YELLOW, -1);
-    init_pair(static_cast<int>(Color::BLUE), COLOR_BLUE, -1);
-    init_pair(static_cast<int>(Color::MAGENTA), COLOR_MAGENTA, -1);
-    init_pair(static_cast<int>(Color::CYAN), COLOR_CYAN, -1);
-    init_pair(static_cast<int>(Color::WHITE), COLOR_WHITE, -1);
+    ncursesInitPair(static_cast<int>(Color::DEFAULT), -1, -1);
+    ncursesInitPair(static_cast<int>(Color::BLACK), COLOR_BLACK, -1);
+    ncursesInitPair(static_cast<int>(Color::RED), COLOR_RED, -1);
+    ncursesInitPair(static_cast<int>(Color::GREEN), COLOR_GREEN, -1);
+    ncursesInitPair(static_cast<int>(Color::YELLOW), COLOR_YELLOW, -1);
+    ncursesInitPair(static_cast<int>(Color::BLUE), COLOR_BLUE, -1);
+    ncursesInitPair(static_cast<int>(Color::MAGENTA), COLOR_MAGENTA, -1);
+    ncursesInitPair(static_cast<int>(Color::CYAN), COLOR_CYAN, -1);
+    ncursesInitPair(static_cast<int>(Color::WHITE), COLOR_WHITE, -1);
 }
 
 /**
@@ -537,9 +625,9 @@ void NcursesGraphics::showSplashScreen()
     
     refresh();
     
-    timeout(2000);
-    getch();
-    timeout(10);
+    ncursesTimeout(2000);
+    ncursesGetch();
+    ncursesTimeout(10);
     
     clear();
     refresh();
@@ -600,16 +688,16 @@ void NcursesGraphics::waitForAnyKey()
 void NcursesGraphics::drawProgressBar(int x, int y, int width, int value, int maxValue, Color color) {
     if (!_initialized) return;
     int progress = static_cast<int>((static_cast<float>(value) / maxValue) * (width - 2));
-    attron(COLOR_PAIR(static_cast<int>(color)));
-    mvprintw(y, x, "[");
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)));
+    ncursesPrintw(y, x, "[");
     for (int i = 0; i < progress; i++) {
-        mvprintw(y, x + 1 + i, "=");
+        ncursesPrintw(y, x + 1 + i, "=");
     }
     for (int i = progress; i < width - 2; i++) {
-        mvprintw(y, x + 1 + i, " ");
+        ncursesPrintw(y, x + 1 + i, " ");
     }
-    mvprintw(y, x + width - 1, "]");
-    attroff(COLOR_PAIR(static_cast<int>(color)));
+    ncursesPrintw(y, x + width - 1, "]");
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)));
 }
 
 /**
@@ -684,9 +772,9 @@ std::string ColorMapper::getReset() {
 void NcursesGraphics::drawBoldText(int x, int y, const std::string& text, Color color)
 {
     if (!_initialized) return;
-    attron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
-    mvaddstr(y, x, text.c_str());
-    attroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+    ncursesAttron(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
+    ncursesAddstr(y, x, text);
+    ncursesAttroff(COLOR_PAIR(static_cast<int>(color)) | A_BOLD);
 }
 
 /**
@@ -724,9 +812,9 @@ void NcursesGraphics::drawMenu(
     
     clear();
     
-    attron(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)) | A_BOLD);
+    ncursesAttron(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)) | A_BOLD);
     drawTextCentered(1, "=== " + title + " ===", Color::WHITE);
-    attroff(A_BOLD);
+    ncursesAttroff(A_BOLD);
     
     int boxWidth = 25;
     int boxHeight = 12;
@@ -771,9 +859,9 @@ void NcursesGraphics::drawMenu(
                           ? Color::YELLOW : Color::WHITE;
         
         if (isGameBoxSelected && static_cast<int>(i) == selectedGameIndex) {
-            attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
-            mvprintw(startY + 2 + static_cast<int>(i), startX + 2, "> %s", displayGameNames[i].c_str());
-            attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            ncursesAttron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            ncursesAddstr(startY + 2 + static_cast<int>(i), startX + 2, "> %s", displayGameNames[i].c_str());
+            ncursesAttroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
         } else {
             drawText(startX + 2, startY + 2 + static_cast<int>(i), displayGameNames[i], itemColor);
         }
@@ -788,9 +876,9 @@ void NcursesGraphics::drawMenu(
                           ? Color::YELLOW : Color::WHITE;
         
         if (isGraphicsBoxSelected && static_cast<int>(i) == selectedGraphicIndex) {
-            attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
-            mvprintw(startY + 2 + static_cast<int>(i), startX + boxWidth + spacing + 2, "> %s", displayGraphicNames[i].c_str());
-            attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            ncursesAttron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            ncursesAddstr(startY + 2 + static_cast<int>(i), startX + boxWidth + spacing + 2, "> %s", displayGraphicNames[i].c_str());
+            ncursesAttroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
         } else {
             drawText(startX + boxWidth + spacing + 2, startY + 2 + static_cast<int>(i), 
                     displayGraphicNames[i], itemColor);
@@ -807,9 +895,9 @@ void NcursesGraphics::drawMenu(
                           ? Color::YELLOW : Color::WHITE;
         
         if (isPlayerBoxSelected && static_cast<int>(i) == playerOptionSelected) {
-            attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
-            mvprintw(startY + 2 + static_cast<int>(i), startX + 2 * (boxWidth + spacing) + 2, "> %s", playerOptions[i].c_str());
-            attroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            ncursesAttron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+            ncursesAddstr(startY + 2 + static_cast<int>(i), startX + 2 * (boxWidth + spacing) + 2, "> %s", playerOptions[i].c_str());
+            ncursesAttroff(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
         } else {
             drawText(startX + 2 * (boxWidth + spacing) + 2, startY + 2 + static_cast<int>(i), 
                     playerOptions[i], itemColor);
@@ -819,9 +907,9 @@ void NcursesGraphics::drawMenu(
     int instructionY = startY + boxHeight + 2;
     drawBox(startX, instructionY, 3 * boxWidth + 2 * spacing, 9, Color::BLUE);
     
-    attron(COLOR_PAIR(getColorPair(COLOR_CYAN, COLOR_BLACK)) | A_BOLD);
+    ncursesAttron(COLOR_PAIR(getColorPair(COLOR_CYAN, COLOR_BLACK)) | A_BOLD);
     drawTextCentered(instructionY, "CONTROLS", Color::CYAN);
-    attroff(A_BOLD);
+    ncursesAttroff(A_BOLD);
     
     std::vector<std::pair<std::string, std::string>> instructions = {
         {"SELECT", "TAB key"},
@@ -833,13 +921,13 @@ void NcursesGraphics::drawMenu(
     for (size_t i = 0; i < instructions.size(); i++) {
         int y = instructionY + 2 + static_cast<int>(i) * 2;
         
-        attron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
-        mvprintw(y, startX + 4, "%s:", instructions[i].first.c_str());
-        attroff(A_BOLD);
+        ncursesAttron(COLOR_PAIR(getColorPair(COLOR_YELLOW, COLOR_BLACK)) | A_BOLD);
+        ncursesAddstr(y, startX + 4, "%s:", instructions[i].first.c_str());
+        ncursesAttroff(A_BOLD);
         
-        attron(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
-        mvprintw(y, startX + 15, "%s", instructions[i].second.c_str());
-        attroff(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
+        ncursesAttron(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
+        ncursesAddstr(y, startX + 15, "%s", instructions[i].second.c_str());
+        ncursesAttroff(COLOR_PAIR(getColorPair(COLOR_WHITE, COLOR_BLACK)));
     }
     
     refresh();
