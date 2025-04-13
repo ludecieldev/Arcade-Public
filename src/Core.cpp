@@ -7,25 +7,24 @@
 
 #include "Core.hpp"
 #include "utils/Error.hpp"
-#include "utils/Event.hpp"
-#include "utils/KeyCodes.hpp"
 #include <iostream>
-#include <chrono>
-#include <thread>
-#include <algorithm>
+#include <time.h>
+#include <ncurses.h>
+#include <string.h>
 
 namespace arcd {
 
 Core::Core(const std::string& initialGraphicsLib)
-    : _state(CoreState::MENU), _selectedMenuOption(0), _deltaTime(0.0)
+    : _state(AppState::MENU), 
+      _selectedMenuOption(0), 
+      _selectedSubMenuOption(0),
+      _selectedGameIndex(0),
+      _selectedGraphicsIndex(0)
 {
     _libManager = std::make_unique<LibraryManager>("./lib");
     _scoreManager = std::make_unique<ScoreManager>();
     _gameManager = std::make_unique<GameManager>();
     _playerName = "Player";
-    
-    // Initialize time tracking
-    _lastFrameTime = std::chrono::high_resolution_clock::now();
     
     // Scan for available libraries
     _libManager->scanLibraries();
@@ -36,8 +35,13 @@ Core::Core(const std::string& initialGraphicsLib)
         throw ArcadeError(error);
     }
     
-    // Ne pas charger de jeu par défaut - laisser l'utilisateur choisir
-    
+    // Load first available game library
+    auto gameLibs = _libManager->getGameLibraries();
+    if (!gameLibs.empty()) {
+        if (!_libManager->loadGameLibrary(gameLibs[0])) {
+            std::cerr << "Warning: Failed to load initial game library: " << _libManager->getLastError() << std::endl;
+        }
+    }
     initializeMenu();
 }
 
@@ -50,7 +54,7 @@ bool Core::initialize()
     if (!_libManager->hasGraphicsLibrary()) {
         return false;
     }
-    
+
     try {
         auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
         return graphicsLib.initialize();
@@ -60,548 +64,126 @@ bool Core::initialize()
     }
 }
 
-void Core::calculateDeltaTime()
-{
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    _deltaTime = std::chrono::duration<double>(currentTime - _lastFrameTime).count();
-    _lastFrameTime = currentTime;
-}
-
 void Core::run()
 {
     if (!_libManager->hasGraphicsLibrary()) {
         std::cerr << "Error: No graphics library loaded" << std::endl;
-        _state = CoreState::EXIT;
+        _state = AppState::EXIT;
         return;
     }
     
-    // Demander le nom du joueur au démarrage s'il n'est pas défini
-    if (_playerName == "Player") {
-        askPlayerName();
+    // If we have a game library loaded at start, initialize the game manager
+    if (_libManager->hasGameLibrary()) {
+        _gameManager->initializeFromLibraryManager(*_libManager);
     }
     
     // Main loop
-    while (_state != CoreState::EXIT) {
+    while (_state != AppState::EXIT) {
         try {
-            // Calculate delta time for frame-rate independent updates
-            calculateDeltaTime();
-            
-            // Verify that the graphics library is still valid
+            // Vérifier que la bibliothèque graphique est toujours valide
             if (!_libManager->hasGraphicsLibrary()) {
                 std::cerr << "Error: Graphics library was unloaded unexpectedly" << std::endl;
-                _state = CoreState::EXIT;
+                _state = AppState::EXIT;
                 break;
             }
             
             auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
             
-            // Process input events
-            processEvents();
+            // Process input
+            int key = graphicsLib.getKey();
+            
+            // Check for exit key
+            if (key == 'q') {
+                _state = AppState::EXIT;
+                continue;
+            }
+            
+            // Handle input based on current state
+            switch (_state) {
+                case AppState::MENU:
+                    handleMenuInput(key);
+                    break;
+                case AppState::GAME:
+                    handleGameInput(key);
+                    break;
+                case AppState::SELECT_GAME:
+                    handleGameSelectionInput(key);
+                    break;
+                case AppState::SELECT_GRAPHICS:
+                    handleGraphicsSelectionInput(key);
+                    break;
+                default:
+                    break;
+            }
+            
+            // Vérifier à nouveau que la bibliothèque est valide après le traitement des entrées
+            if (!_libManager->hasGraphicsLibrary()) {
+                std::cerr << "Error: Graphics library was unloaded during input handling" << std::endl;
+                _state = AppState::EXIT;
+                break;
+            }
             
             // Update game state if in game mode
-            if (_state == CoreState::GAME) {
-                if (_libManager->hasGameLibrary() && _gameManager) {
-                    _gameManager->update(_deltaTime);
-                    updateGameState();
-                } else {
-                    std::cerr << "Error: Missing game library in GAME state" << std::endl;
-                    _state = CoreState::MENU;
+            if (_state == AppState::GAME && _libManager->hasGameLibrary()) {
+                try {
+                    auto& game = _libManager->getCurrentGameLibrary();
+                    game.update();
+                } catch (const std::exception& e) {
+                    std::cerr << "Error updating game: " << e.what() << std::endl;
                 }
             }
             
-            // Update UI elements based on current state
-            updateUI();
+            // Retenir une référence à la bibliothèque graphique pour cette itération
+            auto& currentGraphicsLib = _libManager->getCurrentGraphicsLibrary();
+            currentGraphicsLib.clear();
             
-            // Clear screen for new frame
-            graphicsLib.clear();
-            
-            // Render UI elements (menus, etc.)
-            graphicsLib.renderUI(_uiElements);
-            
-            // Render game state if available
-            if (_state == CoreState::GAME && _currentGameState) {
-                graphicsLib.renderGameState(*_currentGameState);
+            // Render based on current state
+            switch (_state) {
+                case AppState::MENU:
+                    renderMenu();
+                    break;
+                case AppState::GAME:
+                    renderGame();
+                    break;
+                case AppState::SELECT_GAME:
+                    renderGameSelection();
+                    break;
+                case AppState::SELECT_GRAPHICS:
+                    renderGraphicsSelection();
+                    break;
+                default:
+                    break;
             }
             
-            // Refresh display
-            graphicsLib.refresh();
+            // Vérifier encore une fois que la bibliothèque est valide après le rendu
+            if (!_libManager->hasGraphicsLibrary()) {
+                std::cerr << "Error: Graphics library was unloaded during rendering" << std::endl;
+                _state = AppState::EXIT;
+                break;
+            }
             
-            // Small delay to avoid consuming too much CPU
-            std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60fps cap
-            
+            currentGraphicsLib.refresh();
         } catch (const std::exception& e) {
             std::cerr << "Error in main loop: " << e.what() << std::endl;
-            // Short pause to avoid spamming errors
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            // Une courte pause pour éviter de spammer les erreurs
+            struct timespec ts;
+            ts.tv_sec = 0;
+            ts.tv_nsec = 500000000; // 500ms
+            nanosleep(&ts, NULL);
         } catch (...) {
             std::cerr << "Unknown error in main loop" << std::endl;
-            // Short pause to avoid spamming errors
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            // Une courte pause pour éviter de spammer les erreurs
+            struct timespec ts;
+            ts.tv_sec = 0;
+            ts.tv_nsec = 500000000; // 500ms
+            nanosleep(&ts, NULL);
         }
-    }
-}
-
-void Core::processEvents()
-{
-    auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
-    
-    auto eventOpt = graphicsLib.pollEvent();
-    if (!eventOpt) {
-        return;
-    }
-    
-    auto& event = *eventOpt.value();
-    
-    // Global events handling (applicable in any state)
-    handleGlobalEvent(event);
-    
-    // State-specific event handling
-    switch (_state) {
-        case CoreState::MENU:
-            handleMenuEvent(event);
-            break;
-        case CoreState::GAME:
-            handleGameEvent(event);
-            break;
-        case CoreState::SELECT_GAME:
-            handleSelectGameEvent(event);
-            break;
-        case CoreState::SELECT_GRAPHICS:
-            handleSelectGraphicsEvent(event);
-            break;
-        case CoreState::GAME_OVER:
-        case CoreState::PAUSE:
-        case CoreState::EXIT:
-        default:
-            // Will be implemented later
-            break;
-    }
-}
-
-void Core::handleGlobalEvent(const IEvent& event)
-{
-    // Check for quit event
-    if (event.getType() == EventType::KEY_PRESSED) {
-        if (event.getKeyCode() == KeyCode::QUIT) {
-            _state = CoreState::EXIT;
-        } else if (event.getKeyCode() == KeyCode::NEXT_LIB) {
-            // Switch to next graphics library
-            auto libs = _libManager->getGraphicsLibraries();
-            if (libs.size() > 1) {
-                std::string currentLib = _libManager->getCurrentGraphicsLibraryName();
-                auto it = std::find(libs.begin(), libs.end(), currentLib);
-                if (it != libs.end()) {
-                    ++it;
-                    if (it == libs.end()) {
-                        it = libs.begin();
-                    }
-                    switchGraphicsLibrary(*it);
-                }
-            }
-        } else if (event.getKeyCode() == KeyCode::NEXT_GAME) {
-            // Switch to next game library
-            auto games = _libManager->getGameLibraries();
-            if (games.size() > 1) {
-                std::string currentGame = _gameManager->getName();
-                auto it = std::find_if(games.begin(), games.end(), 
-                    [&](const std::string& game) {
-                        return game.find(currentGame) != std::string::npos;
-                    });
-                if (it != games.end()) {
-                    ++it;
-                    if (it == games.end()) {
-                        it = games.begin();
-                    }
-                    switchGameLibrary(*it);
-                }
-            }
-        }
-    }
-}
-
-void Core::handleMenuEvent(const IEvent& event)
-{
-    if (event.getType() != EventType::KEY_PRESSED) {
-        return;
-    }
-    
-    switch (event.getKeyCode()) {
-        case KeyCode::UP:
-            _selectedMenuOption = (_selectedMenuOption > 0) ? _selectedMenuOption - 1 : 0;
-            break;
-        case KeyCode::DOWN:
-            _selectedMenuOption = (_selectedMenuOption < static_cast<int>(_menuOptions.size()) - 1) ? 
-                _selectedMenuOption + 1 : _menuOptions.size() - 1;
-            break;
-        case KeyCode::ENTER:
-            // Handle menu selection
-            switch (_selectedMenuOption) {
-                case 0: // Select Game
-                    updateLibraryLists();
-                    _selectedSubMenuOption = 0;
-                    _state = CoreState::SELECT_GAME;
-                    break;
-                case 1: // Select Graphics
-                    updateLibraryLists();
-                    _selectedSubMenuOption = 0;
-                    _state = CoreState::SELECT_GRAPHICS;
-                    break;
-                case 2: // Leaderboard
-                    // TODO: Implement leaderboard view
-                    break;
-                case 3: // Exit
-                    _state = CoreState::EXIT;
-                    break;
-            }
-            break;
-    }
-}
-
-void Core::handleGameEvent(const IEvent& event)
-{
-    // First check for back to menu
-    if (event.getType() == EventType::KEY_PRESSED && event.getKeyCode() == KeyCode::ESC) {
-        _state = CoreState::MENU;
-        return;
-    }
-    
-    // D'abord essayer de passer l'événement au jeu via le GameManager
-    if (_gameManager && _gameManager->hasGame()) {
-        // Let the game process the event
-        _gameManager->processEvent(event);
         
-        // If game is over, save score
-        if (_gameManager->isGameOver()) {
-            saveScore(_gameManager->getName(), _gameManager->getScore());
-        }
-    } else if (_libManager && _libManager->hasGameLibrary()) {
-        // Sinon, utiliser directement le jeu du LibraryManager
-        try {
-            auto& gameLib = _libManager->getCurrentGameLibrary();
-            gameLib.processEvent(event);
-            
-            // Si le jeu est terminé, sauvegarder le score
-            if (gameLib.isGameOver()) {
-                saveScore(gameLib.getName(), gameLib.getScore());
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "Error processing game event: " << e.what() << std::endl;
-        }
-    }
-}
-
-void Core::handleSelectGameEvent(const IEvent& event)
-{
-    if (event.getType() != EventType::KEY_PRESSED) {
-        return;
-    }
-    
-    switch (event.getKeyCode()) {
-        case KeyCode::UP:
-            _selectedSubMenuOption = (_selectedSubMenuOption > 0) ? 
-                _selectedSubMenuOption - 1 : 0;
-            break;
-        case KeyCode::DOWN:
-            _selectedSubMenuOption = (_selectedSubMenuOption < static_cast<int>(_gameOptions.size()) - 1) ? 
-                _selectedSubMenuOption + 1 : _gameOptions.size() - 1;
-            break;
-        case KeyCode::ENTER:
-            if (_selectedSubMenuOption >= 0 && _selectedSubMenuOption < static_cast<int>(_gameOptions.size())) {
-                // Load the selected game library
-                std::string selectedGame = _gameOptions[_selectedSubMenuOption];
-                switchGameLibrary(selectedGame);
-                
-                // Lancer directement le jeu après sélection
-                _state = CoreState::GAME;
-                if (_gameManager) {
-                    _gameManager->resetGame();
-                }
-            }
-            break;
-        case KeyCode::ESC:
-            _state = CoreState::MENU; // Return to main menu without changing
-            break;
-    }
-}
-
-void Core::handleSelectGraphicsEvent(const IEvent& event)
-{
-    if (event.getType() != EventType::KEY_PRESSED) {
-        return;
-    }
-    
-    switch (event.getKeyCode()) {
-        case KeyCode::UP:
-            _selectedSubMenuOption = (_selectedSubMenuOption > 0) ? 
-                _selectedSubMenuOption - 1 : 0;
-            break;
-        case KeyCode::DOWN:
-            _selectedSubMenuOption = (_selectedSubMenuOption < static_cast<int>(_graphicsOptions.size()) - 1) ? 
-                _selectedSubMenuOption + 1 : _graphicsOptions.size() - 1;
-            break;
-        case KeyCode::ENTER:
-            if (_selectedSubMenuOption >= 0 && _selectedSubMenuOption < static_cast<int>(_graphicsOptions.size())) {
-                // Save the current library name to avoid loading the same one
-                std::string currentLibName = _libManager->getCurrentGraphicsLibraryName();
-                
-                // Get the selected library
-                std::string selectedLib = _graphicsOptions[_selectedSubMenuOption];
-                
-                // Only switch if it's different from the current one
-                if (selectedLib.find(currentLibName) == std::string::npos) {
-                    _state = CoreState::MENU; // Set state before switching to avoid render issues
-                    switchGraphicsLibrary(selectedLib);
-                } else {
-                    _state = CoreState::MENU; // Just go back to menu
-                }
-            }
-            break;
-        case KeyCode::ESC:
-            _state = CoreState::MENU; // Return to main menu without changing
-            break;
-    }
-}
-
-void Core::updateUI()
-{
-    _uiElements.clear();
-    
-    // Prepare different UI based on current state
-    switch (_state) {
-        case CoreState::MENU:
-            {
-                // Title
-                UIElement titleElement = {
-                    UIElementType::TEXT,
-                    static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - 6) / 2),
-                    2,
-                    6, 1,
-                    "ARCADE",
-                    Color::CYAN,
-                    false,
-                    {}  // empty properties map
-                };
-                _uiElements.push_back(titleElement);
-                
-                // Afficher le nom du joueur
-                std::string playerNameText = "Player: " + _playerName;
-                UIElement playerNameElement = {
-                    UIElementType::TEXT,
-                    static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - playerNameText.length()) / 2),
-                    4,
-                    static_cast<int>(playerNameText.length()), 1,
-                    playerNameText,
-                    Color::GREEN,
-                    false,
-                    {}  // empty properties map
-                };
-                _uiElements.push_back(playerNameElement);
-                
-                // Menu options
-                for (size_t i = 0; i < _menuOptions.size(); i++) {
-                    UIElement menuItemElement = {
-                        UIElementType::TEXT,
-                        static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - _menuOptions[i].length()) / 2),
-                        7 + static_cast<int>(i) * 2,  // Start lower due to player name
-                        static_cast<int>(_menuOptions[i].length()), 1,
-                        _menuOptions[i],
-                        Color::WHITE,
-                        static_cast<int>(i) == _selectedMenuOption,
-                        {}  // empty properties map
-                    };
-                    _uiElements.push_back(menuItemElement);
-                }
-                
-                // Current graphics and game info
-                std::string graphicsInfo = "Graphics: " + _libManager->getCurrentGraphicsLibraryName();
-                std::string gameInfo = "Game: " + (_gameManager->hasGame() ? _gameManager->getName() : "None");
-                
-                UIElement graphicsInfoElement = {
-                    UIElementType::TEXT,
-                    2, _libManager->getCurrentGraphicsLibrary().getHeight() - 2,
-                    static_cast<int>(graphicsInfo.length()), 1,
-                    graphicsInfo,
-                    Color::YELLOW,
-                    false,
-                    {}  // empty properties map
-                };
-                _uiElements.push_back(graphicsInfoElement);
-                
-                UIElement gameInfoElement = {
-                    UIElementType::TEXT,
-                    2, _libManager->getCurrentGraphicsLibrary().getHeight() - 3,
-                    static_cast<int>(gameInfo.length()), 1,
-                    gameInfo,
-                    Color::YELLOW,
-                    false,
-                    {}  // empty properties map
-                };
-                _uiElements.push_back(gameInfoElement);
-            }
-            break;
-            
-        case CoreState::GAME:
-            {
-                // Game state is rendered separately in renderGameState
-                // Here we just add UI overlays like score
-                if (_gameManager->hasGame()) {
-                    std::string scoreText = "Score: " + std::to_string(_gameManager->getScore());
-                    UIElement scoreElement = {
-                        UIElementType::TEXT,
-                        2, 1,
-                        static_cast<int>(scoreText.length()), 1,
-                        scoreText,
-                        Color::YELLOW,
-                        false,
-                        {}  // empty properties map
-                    };
-                    _uiElements.push_back(scoreElement);
-                    
-                    // Help text
-                    std::string helpText = "ESC: Menu | 7: Next Game | 9: Next Graphics";
-                    UIElement helpElement = {
-                        UIElementType::TEXT,
-                        static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - helpText.length()) / 2),
-                        _libManager->getCurrentGraphicsLibrary().getHeight() - 1,
-                        static_cast<int>(helpText.length()), 1,
-                        helpText,
-                        Color::WHITE,
-                        false,
-                        {}  // empty properties map
-                    };
-                    _uiElements.push_back(helpElement);
-                }
-            }
-            break;
-            
-        case CoreState::SELECT_GAME:
-            {
-                // Titre du sous-menu
-                UIElement titleElement = {
-                    UIElementType::TEXT,
-                    static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - 15) / 2),
-                    2,
-                    15, 1,
-                    "SELECT A GAME",
-                    Color::CYAN,
-                    false,
-                    {}
-                };
-                _uiElements.push_back(titleElement);
-                
-                // Liste des jeux disponibles
-                for (size_t i = 0; i < _gameOptions.size(); i++) {
-                    std::string gameName = _gameOptions[i];
-                    // Extraire juste le nom du fichier sans le chemin complet
-                    size_t lastSlash = gameName.find_last_of("/\\");
-                    if (lastSlash != std::string::npos) {
-                        gameName = gameName.substr(lastSlash + 1);
-                    }
-                    
-                    UIElement gameItemElement = {
-                        UIElementType::TEXT,
-                        static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - gameName.length()) / 2),
-                        6 + static_cast<int>(i) * 2,
-                        static_cast<int>(gameName.length()), 1,
-                        gameName,
-                        Color::WHITE,
-                        static_cast<int>(i) == _selectedSubMenuOption,
-                        {}
-                    };
-                    _uiElements.push_back(gameItemElement);
-                }
-                
-                // Instructions
-                std::string instructions = "Press ENTER to select, ESC to go back";
-                UIElement instructionsElement = {
-                    UIElementType::TEXT,
-                    static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - instructions.length()) / 2),
-                    _libManager->getCurrentGraphicsLibrary().getHeight() - 3,
-                    static_cast<int>(instructions.length()), 1,
-                    instructions,
-                    Color::YELLOW,
-                    false,
-                    {}
-                };
-                _uiElements.push_back(instructionsElement);
-            }
-            break;
-            
-        case CoreState::SELECT_GRAPHICS:
-            {
-                // Titre du sous-menu
-                UIElement titleElement = {
-                    UIElementType::TEXT,
-                    static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - 19) / 2),
-                    2,
-                    19, 1,
-                    "SELECT A GRAPHICS",
-                    Color::CYAN,
-                    false,
-                    {}
-                };
-                _uiElements.push_back(titleElement);
-                
-                // Liste des bibliothèques graphiques disponibles
-                for (size_t i = 0; i < _graphicsOptions.size(); i++) {
-                    std::string libName = _graphicsOptions[i];
-                    // Extraire juste le nom du fichier sans le chemin complet
-                    size_t lastSlash = libName.find_last_of("/\\");
-                    if (lastSlash != std::string::npos) {
-                        libName = libName.substr(lastSlash + 1);
-                    }
-                    
-                    UIElement libItemElement = {
-                        UIElementType::TEXT,
-                        static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - libName.length()) / 2),
-                        6 + static_cast<int>(i) * 2,
-                        static_cast<int>(libName.length()), 1,
-                        libName,
-                        Color::WHITE,
-                        static_cast<int>(i) == _selectedSubMenuOption,
-                        {}
-                    };
-                    _uiElements.push_back(libItemElement);
-                }
-                
-                // Instructions
-                std::string instructions = "Press ENTER to select, ESC to go back";
-                UIElement instructionsElement = {
-                    UIElementType::TEXT,
-                    static_cast<int>((_libManager->getCurrentGraphicsLibrary().getWidth() - instructions.length()) / 2),
-                    _libManager->getCurrentGraphicsLibrary().getHeight() - 3,
-                    static_cast<int>(instructions.length()), 1,
-                    instructions,
-                    Color::YELLOW,
-                    false,
-                    {}
-                };
-                _uiElements.push_back(instructionsElement);
-            }
-            break;
-            
-        case CoreState::GAME_OVER:
-        case CoreState::PAUSE:
-        case CoreState::EXIT:
-        default:
-            // Ces états seront traités plus tard ou ne nécessitent pas d'UI
-            break;
-    }
-}
-
-void Core::updateGameState()
-{
-    if (_state == CoreState::GAME) {
-        try {
-            if (_libManager && _libManager->hasGameLibrary()) {
-                auto& gameLib = _libManager->getCurrentGameLibrary();
-                _currentGameState = gameLib.getGameState();
-            } else if (_gameManager && _gameManager->hasGame()) {
-                _currentGameState = _gameManager->getGameState();
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "Error updating game state: " << e.what() << std::endl;
-        }
+        // Add a small delay
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 50000000;
+        nanosleep(&ts, NULL);
     }
 }
 
@@ -621,7 +203,7 @@ void Core::cleanup() {
     }
     
     // Reset state
-    _state = CoreState::EXIT;
+    _state = AppState::EXIT;
     
     // Clear any remaining resources
     _gameManager.reset();
@@ -632,167 +214,454 @@ void Core::cleanup() {
 void Core::initializeMenu() {
     _menuOptions = {
         "Select Game",
-        "Select Graphics",
-        "Leaderboard",
+        "Select Graphics Library",
+        "Enter Name",
         "Exit"
     };
-    _selectedMenuOption = 0;
+    updateLibraryLists();
 }
 
 void Core::updateLibraryLists() {
     _gameOptions = _libManager->getGameLibraries();
     _graphicsOptions = _libManager->getGraphicsLibraries();
-}
-
-// ICore implementation methods
-
-CoreState Core::getState() const {
-    return _state;
-}
-
-void Core::setState(CoreState state) {
-    _state = state;
-}
-
-bool Core::loadGameLibrary(const std::string& path) {
-    if (_libManager->loadGameLibrary(path)) {
-        // Mise à jour du GameManager avec le jeu chargé
-        if (_gameManager && _libManager->hasGameLibrary()) {
-            try {
-                // On n'a pas besoin de faire setGame ici car le jeu est déjà initialisé
-                // dans le LibraryManager. On va juste réinitialiser le jeu.
-                _gameManager->resetGame();
-            } catch (const std::exception& e) {
-                std::cerr << "Error updating GameManager: " << e.what() << std::endl;
+    
+    // Mettre à jour les indices sélectionnés
+    _selectedSubMenuOption = 0;
+    
+    // Trouver l'index de la bibliothèque de jeu courante
+    _selectedGameIndex = 0;
+    if (_libManager->hasGameLibrary()) {
+        std::string currentGame = _libManager->getCurrentGameLibraryName();
+        for (size_t i = 0; i < _gameOptions.size(); i++) {
+            if (_gameOptions[i] == currentGame) {
+                _selectedGameIndex = static_cast<int>(i);
+                break;
             }
         }
-        return true;
     }
-    return false;
-}
-
-bool Core::loadGraphicsLibrary(const std::string& path) {
-    return _libManager->loadGraphicsLibrary(path);
-}
-
-bool Core::switchGameLibrary(const std::string& name) {
-    if (_libManager->loadGameLibrary(name)) {
-        // Transfert du jeu du LibraryManager au GameManager
-        try {
-            // Créer une nouvelle instance du jeu via createGameLibrary
-            std::string gamePath = name;
-            if (_libManager->getGameLibraries().size() > 0) {
-                auto it = std::find(_libManager->getGameLibraries().begin(), 
-                                  _libManager->getGameLibraries().end(), name);
-                if (it != _libManager->getGameLibraries().end()) {
-                    gamePath = *it;
-                }
+    
+    // Trouver l'index de la bibliothèque graphique courante
+    _selectedGraphicsIndex = 0;
+    if (_libManager->hasGraphicsLibrary()) {
+        std::string currentGraphics = _libManager->getCurrentGraphicsLibraryName();
+        for (size_t i = 0; i < _graphicsOptions.size(); i++) {
+            if (_graphicsOptions[i] == currentGraphics) {
+                _selectedGraphicsIndex = static_cast<int>(i);
+                break;
             }
-            
-            if (_gameManager) {
-                _gameManager->resetGame();
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "Error in switchGameLibrary: " << e.what() << std::endl;
         }
-        return true;
     }
-    return false;
 }
 
-bool Core::switchGraphicsLibrary(const std::string& name) {
-    return _libManager->loadGraphicsLibrary(name);
-}
-
-std::vector<std::string> Core::getAvailableGameLibraries() const {
-    return _libManager->getGameLibraries();
-}
-
-std::vector<std::string> Core::getAvailableGraphicsLibraries() const {
-    return _libManager->getGraphicsLibraries();
-}
-
-const IGameState* Core::getCurrentGameState() const {
-    return _currentGameState.get();
-}
-
-std::vector<UIElement> Core::getUIElements() const {
-    return _uiElements;
-}
-
-void Core::setPlayerName(const std::string& name) {
-    // Si un nom est fourni, l'utiliser directement
-    if (!name.empty()) {
-        _playerName = name;
+void Core::handleMenuInput(int key)
+{
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
+        _state = AppState::EXIT;
         return;
     }
     
-    // Sinon, demander au joueur son nom via la bibliothèque graphique active
-    if (_libManager && _libManager->hasGraphicsLibrary()) {
-        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
-        graphicsLib.getPlayerName(_playerName);
-        
-        // Assurer un nom par défaut si aucun n'est entré
-        if (_playerName.empty()) {
-            _playerName = "Player";
-        }
-    }
-}
-
-std::string Core::getPlayerName() const {
-    return _playerName;
-}
-
-void Core::saveScore(const std::string& gameName, int score) {
-    _scoreManager->addScore(gameName, _playerName, score);
-}
-
-std::vector<std::pair<std::string, int>> Core::getHighScores(const std::string& gameName) const
-{
-    std::vector<Score> gameScores = _scoreManager->getScores(gameName);
-    std::vector<std::pair<std::string, int>> result;
-    
-    // Convertir les Score en pair<string, int>
-    for (const auto& score : gameScores) {
-        result.emplace_back(score.playerName, score.value);
+    // TAB pour naviguer entre les boîtes
+    if (key == IGraphicsLibrary::KEY_TAB_CODE) {
+        _selectedMenuOption = (_selectedMenuOption + 1) % 3; // 3 boîtes: jeux, graphiques, joueur
+        return;
     }
     
-    return result;
-}
-
-void Core::askPlayerName() {
-    // On utilise la bibliothèque graphique active pour demander le nom du joueur
-    if (_libManager && _libManager->hasGraphicsLibrary()) {
-        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
-        
-        // Préparer l'interface utilisateur pour demander le nom
-        std::vector<UIElement> namePromptUI = {
-            {
-                UIElementType::TEXT,
-                static_cast<int>((graphicsLib.getWidth() - 20) / 2),
-                (graphicsLib.getHeight() / 2) - 5,
-                20, 1,
-                "Enter Your Name:",
-                Color::CYAN,
-                false,
-                {}
+    // Utiliser les flèches selon la boîte sélectionnée
+    if (_selectedMenuOption == 0) { // Boîte des jeux
+        if (key == IGraphicsLibrary::KEY_UP_CODE) {
+            if (_gameOptions.size() > 0) {
+                _selectedGameIndex = (_selectedGameIndex > 0) ? _selectedGameIndex - 1 : 0;
             }
-        };
-        
-        // Afficher la demande
-        graphicsLib.clear();
-        graphicsLib.renderUI(namePromptUI);
-        graphicsLib.refresh();
-        
-        // Demander le nom
-        std::string tempName;
-        graphicsLib.getPlayerName(tempName);
-        
-        // Mettre à jour le nom du joueur s'il n'est pas vide
-        if (!tempName.empty()) {
-            _playerName = tempName;
+        } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+            if (_gameOptions.size() > 0) {
+                _selectedGameIndex = (_selectedGameIndex < static_cast<int>(_gameOptions.size()) - 1) ? 
+                                   _selectedGameIndex + 1 : static_cast<int>(_gameOptions.size()) - 1;
+            }
+        } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+            // Charger la bibliothèque sélectionnée uniquement lors de l'appui sur ENTER
+            if (_gameOptions.size() > 0 && _selectedGameIndex >= 0 && _selectedGameIndex < static_cast<int>(_gameOptions.size())) {
+                if (_libManager->loadGameLibrary(_gameOptions[_selectedGameIndex])) {
+                    if (_libManager->hasGameLibrary()) {
+                        try {
+                            // Initialize GameManager with the loaded game from LibraryManager
+                            if (_gameManager->initializeFromLibraryManager(*_libManager)) {
+                                _state = AppState::GAME;
+                            } else {
+                                std::cerr << "Failed to initialize game: " << _gameManager->getLastError() << std::endl;
+                            }
+                        } catch (const std::exception& e) {
+                            std::cerr << "Error initializing game: " << e.what() << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+    } else if (_selectedMenuOption == 1) { // Boîte des graphiques
+        if (key == IGraphicsLibrary::KEY_UP_CODE) {
+            if (_graphicsOptions.size() > 0) {
+                _selectedGraphicsIndex = (_selectedGraphicsIndex > 0) ? _selectedGraphicsIndex - 1 : 0;
+            }
+        } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+            if (_graphicsOptions.size() > 0) {
+                _selectedGraphicsIndex = (_selectedGraphicsIndex < static_cast<int>(_graphicsOptions.size()) - 1) ? 
+                                      _selectedGraphicsIndex + 1 : static_cast<int>(_graphicsOptions.size()) - 1;
+            }
+        } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+            // Charger la bibliothèque sélectionnée uniquement lors de l'appui sur ENTER
+            if (_graphicsOptions.size() > 0 && _selectedGraphicsIndex >= 0 && _selectedGraphicsIndex < static_cast<int>(_graphicsOptions.size())) {
+                _libManager->loadGraphicsLibrary(_graphicsOptions[_selectedGraphicsIndex]);
+            }
+        }
+    } else if (_selectedMenuOption == 2) { // Boîte du joueur
+        if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+            if (_libManager->hasGraphicsLibrary()) {
+                try {
+                    auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+                    graphicsLib.getPlayerName(_playerName);
+                } catch (...) {
+                    // Handle exception silently
+                }
+            }
         }
     }
+}
+
+void Core::handleGameSelectionInput(int key)
+{
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
+        _state = AppState::MENU;
+    } else if (key == IGraphicsLibrary::KEY_UP_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption > 0) ? _selectedSubMenuOption - 1 : 0;
+    } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption < static_cast<int>(_gameOptions.size()) - 1) ? 
+                                _selectedSubMenuOption + 1 : static_cast<int>(_gameOptions.size()) - 1;
+    } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+        if (!_gameOptions.empty()) {
+            if (_libManager->loadGameLibrary(_gameOptions[_selectedSubMenuOption])) {
+                if (_libManager->hasGameLibrary()) {
+                    try {
+                        // Initialize GameManager with the loaded game from LibraryManager
+                        if (_gameManager->initializeFromLibraryManager(*_libManager)) {
+                            _state = AppState::GAME;
+                        } else {
+                            std::cerr << "Failed to initialize game: " << _gameManager->getLastError() << std::endl;
+                        }
+                    } catch (const std::exception& e) {
+                        std::cerr << "Error loading game: " << e.what() << std::endl;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Core::handleGraphicsSelectionInput(int key)
+{
+    if (key == IGraphicsLibrary::KEY_ESC_CODE) {
+        _state = AppState::MENU;
+    } else if (key == IGraphicsLibrary::KEY_UP_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption > 0) ? _selectedSubMenuOption - 1 : 0;
+    } else if (key == IGraphicsLibrary::KEY_DOWN_CODE) {
+        _selectedSubMenuOption = (_selectedSubMenuOption < static_cast<int>(_graphicsOptions.size()) - 1) ? 
+                                _selectedSubMenuOption + 1 : static_cast<int>(_graphicsOptions.size()) - 1;
+    } else if (key == IGraphicsLibrary::KEY_ENTER_CODE) {
+        if (!_graphicsOptions.empty()) {
+            try {
+                // Store current library name to restore if loading fails
+                std::string currentLib = _libManager->getCurrentGraphicsLibraryName();
+                
+                if (_libManager->loadGraphicsLibrary(_graphicsOptions[_selectedSubMenuOption])) {
+                    // Successfully loaded
+                    _state = AppState::MENU;
+                } else {
+                    // Loading failed, try to restore previous library
+                    std::cerr << "Failed to load graphics library: " << _libManager->getLastError() << std::endl;
+                    if (!currentLib.empty()) {
+                        _libManager->loadGraphicsLibrary(currentLib);
+                    }
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error switching graphics library: " << e.what() << std::endl;
+            }
+        }
+        _state = AppState::MENU;
+    }
+}
+
+void Core::renderMenu() {
+    if (!_libManager->hasGraphicsLibrary()) {
+        return;
+    }
+    
+    try {
+        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+        
+        // Get game names for menu display
+        std::vector<std::string> gameNames;
+        if (_gameOptions.empty()) {
+            gameNames.push_back("No games available");
+        } else {
+            for (const auto& game : _gameOptions) {
+                gameNames.push_back(game);
+            }
+        }
+        
+        // Get graphics library names for menu display
+        std::vector<std::string> graphicsNames;
+        if (_graphicsOptions.empty()) {
+            graphicsNames.push_back("No graphics available");
+        } else {
+            for (const auto& graphics : _graphicsOptions) {
+                graphicsNames.push_back(graphics);
+            }
+        }
+        
+        // Mettre à jour les indices sélectionnés si nécessaire
+        if (_selectedGameIndex >= static_cast<int>(_gameOptions.size())) {
+            _selectedGameIndex = _gameOptions.empty() ? 0 : static_cast<int>(_gameOptions.size()) - 1;
+        }
+        
+        if (_selectedGraphicsIndex >= static_cast<int>(_graphicsOptions.size())) {
+            _selectedGraphicsIndex = _graphicsOptions.empty() ? 0 : static_cast<int>(_graphicsOptions.size()) - 1;
+        }
+        
+        // Use the standardized menu drawing method
+        graphicsLib.drawMenu(
+            "ARCADE",
+            gameNames,
+            graphicsNames,
+            _playerName,
+            _selectedMenuOption,
+            _selectedGameIndex,
+            _selectedGraphicsIndex
+        );
+    } catch (const std::exception& e) {
+        std::cerr << "Error rendering menu: " << e.what() << std::endl;
+    }
+}
+
+void Core::handleGameInput(int key)
+{
+    if (!_libManager->hasGameLibrary()) {
+        _state = AppState::MENU;
+        return;
+    }
+
+    try {
+        auto& game = _libManager->getCurrentGameLibrary();
+        
+        // First, pass all arrow key inputs to the game
+        if (key == IGraphicsLibrary::KEY_LEFT_CODE || 
+            key == IGraphicsLibrary::KEY_RIGHT_CODE ||
+            key == IGraphicsLibrary::KEY_UP_CODE ||
+            key == IGraphicsLibrary::KEY_DOWN_CODE) {
+            game.handleInput(key);
+            return;
+        }
+        
+        // Then handle other keys
+        switch (key) {
+            case '9': // Use specific key for next graphics library
+                _libManager->loadNextGraphicsLibrary();
+                break;
+            case '7': // Use specific key for next game
+                if (_libManager->loadNextGameLibrary()) {
+                    if (_libManager->hasGameLibrary()) {
+                        // Initialize GameManager with the loaded game from LibraryManager
+                        _gameManager->initializeFromLibraryManager(*_libManager);
+                    }
+                }
+                break;
+            case IGraphicsLibrary::KEY_ESC_CODE:
+                _state = AppState::MENU;
+                break;
+            case 'r':
+            case 'R':
+                if (game.isGameOver()) {
+                    game.restart();
+                }
+                break;
+            case 'q':
+            case 'Q':
+                _state = AppState::MENU;
+                break;
+            case 'e':
+            case 'E':
+                _state = AppState::EXIT;
+                break;
+            default:
+                // Pass input directly to the game
+                game.handleInput(key);
+                break;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error handling input: " << e.what() << std::endl;
+    }
+}
+
+void Core::renderGame() {
+    if (!_libManager->hasGraphicsLibrary()) {
+        return;
+    }
+    
+    try {
+        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+        graphicsLib.clear();
+        
+        // Since the GameManager doesn't have a direct copy of the game,
+        // we'll render the game directly from the LibraryManager
+        if (_libManager->hasGameLibrary()) {
+            auto& game = _libManager->getCurrentGameLibrary();
+            game.render(graphicsLib);
+            
+            // Check if game is over
+            if (game.isGameOver()) {
+                // Add score
+                _scoreManager->addScore(_playerName, game.getName(), game.getScore());
+                
+                // Return to menu
+                _state = AppState::MENU;
+            }
+        } else {
+            // No game loaded, return to menu
+            _state = AppState::MENU;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error rendering game: " << e.what() << std::endl;
+        _state = AppState::MENU;
+    }
+}
+
+void Core::renderGameSelection()
+{
+    if (!_libManager->hasGraphicsLibrary()) {
+        return;
+    }
+    
+    try {
+        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+        
+        // Calculate dimensions with safety margins
+        int width = std::max(40, graphicsLib.getWidth());
+        int height = std::max(20, graphicsLib.getHeight());
+        
+        // Draw title with safe dimensions
+        int titleWidth = std::min(40, width - 6);
+        int titleHeight = 3;
+        int startX = std::max(2, (width - titleWidth) / 2);
+        int startY = std::max(2, (height - titleHeight) / 2);
+        
+        // Ensure we have enough space and margins
+        if (startX < 2 || startY < 2 || startY + titleHeight >= height - 2 || startX + titleWidth >= width - 2) {
+            return;
+        }
+        
+        graphicsLib.drawBox(startX, startY - 2, titleWidth, titleHeight, Color::CYAN);
+        std::string title = "Select Game";
+        int titleX = startX + (titleWidth - static_cast<int>(title.length())) / 2;
+        graphicsLib.drawText(titleX, startY - 1, title, Color::CYAN);
+        
+        // Draw game options with safety checks
+        int menuStartY = startY + 2;
+        if (_gameOptions.empty()) {
+            if (menuStartY < height - 2) {
+                graphicsLib.drawText(startX, menuStartY, "No games available", Color::RED);
+            }
+        } else {
+            int maxItems = std::min(static_cast<int>(_gameOptions.size()), (height - menuStartY - 2));
+            for (int i = 0; i < maxItems; i++) {
+                std::string prefix = (i == _selectedSubMenuOption) ? "> " : "  ";
+                std::string menuText = prefix + _gameOptions[i];
+                if (startX + static_cast<int>(menuText.length()) < width - 2) {
+                    graphicsLib.drawText(startX, menuStartY + i, menuText, Color::GREEN);
+                }
+            }
+        }
+        
+        // Draw controls with bounds checking
+        if (height > 4) {
+            int controlsY = height - 2;
+            std::string controls = "ESC=Back | Enter=Select";
+            if (controls.length() < static_cast<size_t>(width - 4)) {
+                graphicsLib.drawText(2, controlsY, controls, Color::GREEN);
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error rendering game selection: " << e.what() << std::endl;
+    }
+}
+
+void Core::renderGraphicsSelection()
+{
+    if (!_libManager->hasGraphicsLibrary()) {
+        return;
+    }
+    
+    try {
+        auto& graphicsLib = _libManager->getCurrentGraphicsLibrary();
+        
+        // Calculate dimensions with safety margins
+        int width = std::max(40, graphicsLib.getWidth());
+        int height = std::max(20, graphicsLib.getHeight());
+        
+        // Draw title with safe dimensions
+        int titleWidth = std::min(40, width - 6);
+        int titleHeight = 3;
+        int startX = std::max(2, (width - titleWidth) / 2);
+        int startY = std::max(2, (height - titleHeight) / 2);
+        
+        // Ensure we have enough space and margins
+        if (startX < 2 || startY < 2 || startY + titleHeight >= height - 2 || startX + titleWidth >= width - 2) {
+            return;
+        }
+        
+        graphicsLib.drawBox(startX, startY - 2, titleWidth, titleHeight, Color::CYAN);
+        std::string title = "Select Graphics Library";
+        int titleX = startX + (titleWidth - static_cast<int>(title.length())) / 2;
+        graphicsLib.drawText(titleX, startY - 1, title, Color::CYAN);
+        
+        // Draw graphics options with safety checks
+        int menuStartY = startY + 2;
+        if (_graphicsOptions.empty()) {
+            if (menuStartY < height - 2) {
+                graphicsLib.drawText(startX, menuStartY, "No graphics libraries available", Color::RED);
+            }
+        } else {
+            int maxItems = std::min(static_cast<int>(_graphicsOptions.size()), (height - menuStartY - 2));
+            for (int i = 0; i < maxItems; i++) {
+                std::string prefix = (i == _selectedSubMenuOption) ? "> " : "  ";
+                std::string menuText = prefix + _graphicsOptions[i];
+                if (startX + static_cast<int>(menuText.length()) < width - 2) {
+                    graphicsLib.drawText(startX, menuStartY + i, menuText, Color::GREEN);
+                }
+            }
+        }
+        
+        // Draw controls with bounds checking
+        if (height > 4) {
+            int controlsY = height - 2;
+            std::string controls = "ESC=Back | Enter=Select";
+            if (controls.length() < static_cast<size_t>(width - 4)) {
+                graphicsLib.drawText(2, controlsY, controls, Color::GREEN);
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error rendering graphics selection: " << e.what() << std::endl;
+    }
+}
+
+AppState Core::getState() const {
+    return _state;
+}
+
+std::vector<std::string> Core::getGameLibraries() const
+{
+    return _libManager->getGameLibraries();
+}
+
+std::vector<std::string> Core::getGraphicsLibraries() const
+{
+    return _libManager->getGraphicsLibraries();
 }
 
 } // namespace arcd
