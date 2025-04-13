@@ -86,19 +86,36 @@ All graphics libraries implement the `IGraphicsLibrary` interface defined in `in
 class IGraphicsLibrary {
 public:
     // Common key codes
-    static const int KEY_UP_CODE = -1;
-    static const int KEY_DOWN_CODE = -2;
-    static const int KEY_LEFT_CODE = -3;
-    static const int KEY_RIGHT_CODE = -4;
-    static const int KEY_ENTER_CODE = -5;
-    static const int KEY_ESC_CODE = -6;
-    static const int KEY_BACKSPACE_CODE = -7;
-    static const int KEY_NEXT_LIB_CODE = -8;
-    static const int KEY_NEXT_GAME_CODE = -9;
+    static constexpr int KEY_UP_CODE = 259;
+    static constexpr int KEY_DOWN_CODE = 258;
+    static constexpr int KEY_LEFT_CODE = 260;
+    static constexpr int KEY_RIGHT_CODE = 261;
+    static constexpr int KEY_ENTER_CODE = 10;
+    static constexpr int KEY_ESC_CODE = 27;
+    static constexpr int KEY_BACKSPACE_CODE = 127;
+    static constexpr int KEY_NEXT_LIB_CODE = '9';
+    static constexpr int KEY_NEXT_GAME_CODE = '7';
+    static constexpr int KEY_SPACE_CODE = ' ';
+    static constexpr int KEY_TAB_CODE = '\t';
+    static constexpr int KEY_RESTART_GAME = 'r';
+    
+    // Mouse constants
+    static constexpr int MOUSE_LEFT_BUTTON = 1;
+    static constexpr int MOUSE_RIGHT_BUTTON = 2;
+    static constexpr int MOUSE_MIDDLE_BUTTON = 3;
+    
+    // Mouse event structure
+    struct MouseEvent {
+        int x;                // X coordinate
+        int y;                // Y coordinate
+        int button;           // Button code (MOUSE_LEFT_BUTTON, MOUSE_RIGHT_BUTTON, etc.)
+        bool pressed;         // true if button is pressed, false if released
+        bool hasEvent;        // true if there's a mouse event, false otherwise
+    };
     
     // Colors for rendering
     enum class Color {
-        DEFAULT, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
+        DEFAULT, BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE
     };
     
     virtual ~IGraphicsLibrary() = default;
@@ -116,8 +133,19 @@ public:
     virtual void drawBox(int x, int y, int width, int height, Color color = Color::DEFAULT) = 0;
     virtual void drawList(int x, int y, const std::vector<std::string>& items, int selectedIndex, Color color = Color::DEFAULT) = 0;
     
+    // Standardized menu drawing
+    virtual void drawMenu(
+        const std::string& title,
+        const std::vector<std::string>& gameOptions,
+        const std::vector<std::string>& graphicOptions,
+        const std::string& playerName,
+        int selectedMenu,
+        int selectedGameIndex,
+        int selectedGraphicIndex) = 0;
+    
     // Input handling
     virtual int getKey() = 0;
+    virtual MouseEvent getMouse() = 0;
     
     // Player name input
     virtual void getPlayerName(std::string& playerName) = 0;
@@ -139,12 +167,14 @@ The Ncurses graphics library (`NcursesGraphics`) implements the graphics interfa
 - Terminal-based graphics
 - Color support
 - Keyboard input handling
+- Mouse input handling (basic support)
 - Simple text and box drawing
 
 ### Special Considerations
 - **Resource Management**: Requires special handling to avoid segfaults when unloading
 - **Terminal Reset**: Needs proper terminal state restoration in cleanup()
 - **Timing**: Needs longer delays when unloading to avoid crashes
+- **Mouse Support**: Basic mouse support with position and button detection
 
 ## SDL2 Graphics Library Implementation
 
@@ -156,6 +186,7 @@ The SDL2 graphics library (`SDL2Graphics`) implements the graphics interface usi
 - TrueType font support
 - Event handling
 - Color management
+- Full mouse support with coordinates and buttons
 
 ## SFML Graphics Library Implementation
 
@@ -167,6 +198,19 @@ The SFML graphics library (`SFMLGraphics`) implements the graphics interface usi
 - Event handling
 - Font rendering
 - Color management
+
+## Allegro5 Graphics Library Implementation
+
+The Allegro5 graphics library (`Allegro5Graphics`) implements the graphics interface using the Allegro5 library.
+
+### Features
+- Window-based graphics
+- Hardware acceleration
+- TrueType font support
+- Event handling
+- Color management
+- Full mouse support with coordinates and buttons
+- Coordinate scaling for consistent display across libraries
 
 ## Memory Management Practices
 
@@ -215,6 +259,41 @@ For optimal performance, graphics libraries:
 - Cache resources where possible
 - Leverage hardware acceleration when available
 - Maintain consistent frame rates
+
+## Input Handling
+
+### Keyboard Input
+
+All graphics libraries standardize keyboard input through the `getKey()` method, which returns standardized key codes.
+
+### Mouse Input
+
+The Arcade project includes mouse input support through the `getMouse()` method. This returns a `MouseEvent` structure containing:
+
+- **x, y**: The mouse cursor coordinates
+- **button**: The button that was pressed/released (LEFT, RIGHT, MIDDLE)
+- **pressed**: Whether the button is being pressed (true) or released (false)
+- **hasEvent**: Whether a mouse event has occurred
+
+Mouse input is standardized across all graphics libraries:
+
+| Library | Mouse Support Level |
+|---------|---------------------|
+| Ncurses | Basic support (terminal limitations) |
+| SDL2    | Full support with precise coordinates |
+| Allegro5| Full support with precise coordinates |
+
+Games implement the `handleMouseInput()` method to respond to mouse events, which is particularly useful for games like Minesweeper that benefit from mouse interaction.
+
+## Coordinate Scaling
+
+To ensure consistent display across different graphics libraries, coordinate scaling is implemented:
+
+- **Ncurses**: Uses character-based coordinates (1 unit = 1 character cell)
+- **SDL2**: Applies scaling factors (typically 10x for x-coordinate, 20x for y-coordinate)
+- **Allegro5**: Applies similar scaling factors as SDL2 for consistency
+
+This scaling ensures that games appear properly sized regardless of which graphics library is in use.
 
 ## Next Steps
 

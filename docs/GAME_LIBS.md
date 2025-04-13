@@ -42,6 +42,7 @@ public:
     
     // Input handling
     virtual void handleInput(int key) = 0;
+    virtual void handleMouseInput(const IGraphicsLibrary::MouseEvent& event) = 0;
     
     // Game information
     virtual std::string getName() const = 0;
@@ -54,6 +55,24 @@ public:
     // Game state
     virtual bool isGameOver() const = 0;
 };
+```
+
+## Mouse Input Support
+
+The addition of `handleMouseInput` method allows games to process mouse events. This is particularly useful for:
+
+- **Minesweeper**: Clicking to reveal cells or place flags
+- **Card Games**: Selecting or dragging cards
+- **Point-and-Click Games**: Interacting with game elements
+
+Games that don't require mouse input can provide a minimal implementation:
+
+```cpp
+void MyGame::handleMouseInput(const IGraphicsLibrary::MouseEvent& event) 
+{
+    // Ignore mouse events in this game
+    (void)event;
+}
 ```
 
 ## Snake Game Implementation
@@ -108,6 +127,7 @@ public:
     void update(Core* core) override;
     void render(IGraphicsLibrary* graphicsLib) override;
     void handleInput(int key) override;
+    void handleMouseInput(const IGraphicsLibrary::MouseEvent& event) override;
     std::string getName() const override;
     std::string getDescription() const override;
     int getScore() const override;

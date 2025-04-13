@@ -26,7 +26,7 @@ The Arcade project is built around a modular architecture with three main compon
 During the main application loop:
 
 1. The Core processes any system events (like switching libraries).
-2. The Core passes user input from the graphics library to the active game.
+2. The Core passes user input (keyboard and mouse) from the graphics library to the active game.
 3. The game updates its state based on input and elapsed time.
 4. The game sends drawing commands to the graphics library through the Core.
 5. The graphics library renders the frame.
@@ -74,12 +74,33 @@ arcade/
 
 Events flow through the system as follows:
 
-1. User inputs are captured by the graphics library
+1. User inputs (keyboard and mouse) are captured by the graphics library
 2. The graphics library passes events to the Core
 3. The Core processes system-level events (switching libraries)
-4. Gameplay events are passed to the active game
+4. Gameplay events are passed to the active game through either `handleInput` (for keyboard) or `handleMouseInput` (for mouse)
 5. The game updates its state
 6. The game instructs the graphics library what to render
+
+## Input Handling System
+
+The architecture includes a comprehensive input handling system:
+
+### Keyboard Input
+- Standardized key codes are defined in the `IGraphicsLibrary` interface
+- The `getKey()` method provides keyboard input to the Core
+- Games process keyboard input through the `handleInput(int key)` method
+
+### Mouse Input
+- Mouse events are encapsulated in the `MouseEvent` structure
+- The `getMouse()` method provides mouse position and button state
+- Games process mouse input through the `handleMouseInput(const MouseEvent&)` method
+- Different graphics libraries provide varying levels of mouse support, from basic (Ncurses) to full (SDL2, Allegro5)
+
+### Input Adaptability
+Games can adapt to different input methods based on available features:
+- Check which graphics library is active and adjust input handling accordingly
+- Provide fallback mechanisms for libraries with limited capabilities
+- Offer multiple control schemes when appropriate
 
 ## Error Handling
 
