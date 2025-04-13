@@ -26,7 +26,6 @@ public:
 
     // Input handling
     virtual void handleInput(int key) = 0;
-    virtual void handleMouseInput(const IGraphicsLibrary::MouseEvent& event) = 0;
 
     // Rendering
     virtual void render(IGraphicsLibrary& graphicsLib) = 0;

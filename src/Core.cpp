@@ -99,13 +99,6 @@ void Core::run()
             // Process keyboard input
             int key = graphicsLib.getKey();
             
-            // Process mouse input (sera utilisé plus tard par Minesweeper)
-            IGraphicsLibrary::MouseEvent mouseEvent = graphicsLib.getMouse();
-            if (mouseEvent.hasEvent && _state == AppState::GAME && _libManager->hasGameLibrary()) {
-                auto& game = _libManager->getCurrentGameLibrary();
-                game.handleMouseInput(mouseEvent);
-            }
-            
             // Check for exit key
             if (key == 'q') {
                 _state = AppState::EXIT;
