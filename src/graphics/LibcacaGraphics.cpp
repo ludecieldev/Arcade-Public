@@ -44,6 +44,16 @@ std::string LibcacaGraphics::getName() const {
  */
 bool LibcacaGraphics::initialize() {
     try {
+        // Vérifier si la bibliothèque est déjà initialisée
+        if (canvas && display) {
+            return true; // Éviter l'initialisation multiple
+        }
+
+        // Si seulement l'un des deux objets existe, nettoyer avant de réinitialiser
+        if (canvas || display) {
+            cleanup();
+        }
+
         caca_canvas_t* rawCanvas = caca_create_canvas(windowWidth, windowHeight);
         if (!rawCanvas) {
             throw std::runtime_error("Failed to create libcaca canvas");
@@ -62,7 +72,7 @@ bool LibcacaGraphics::initialize() {
         setColorAnsi(CACA_WHITE, CACA_BLACK);
         putStr(windowWidth/2 - 5, windowHeight/2, "ARCADE");
         refresh();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Réduit le temps d'attente
 
         return true;
     } catch (const std::exception& e) {
