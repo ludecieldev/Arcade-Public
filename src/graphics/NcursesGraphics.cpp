@@ -329,6 +329,8 @@ int NcursesGraphics::getKey()
         case 10: return KEY_ENTER_CODE;
         case '9': return KEY_NEXT_LIB_CODE;
         case '7': return KEY_NEXT_GAME_CODE;
+        case 'r': return KEY_RESTART_GAME;
+        case 'R': return KEY_RESTART_GAME;
         default: return ch;
     }
 }

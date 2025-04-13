@@ -214,7 +214,21 @@ int SDL2Graphics::getKey()
                 case SDLK_BACKSPACE: return IGraphicsLibrary::KEY_BACKSPACE_CODE;
                 case SDLK_9: return IGraphicsLibrary::KEY_NEXT_LIB_CODE;
                 case SDLK_7: return IGraphicsLibrary::KEY_NEXT_GAME_CODE;
-                default: return event.key.keysym.sym;
+                case SDLK_r: return IGraphicsLibrary::KEY_RESTART_GAME;
+                default: 
+                    // Pour les touches alphabétiques
+                    if (event.key.keysym.sym >= SDLK_a && event.key.keysym.sym <= SDLK_z) {
+                        // Gestion spéciale de R/r
+                        if (event.key.keysym.sym == SDLK_r) {
+                            return IGraphicsLibrary::KEY_RESTART_GAME;
+                        }
+                        return event.key.keysym.sym;
+                    }
+                    // Pour les touches numériques
+                    else if (event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9) {
+                        return event.key.keysym.sym;
+                    }
+                    return event.key.keysym.sym;
             }
         }
     }

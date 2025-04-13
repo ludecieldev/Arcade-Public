@@ -157,9 +157,25 @@ int Allegro5Graphics::getKey() {
                     return KEY_NEXT_LIB_CODE;
                 case ALLEGRO_KEY_7:
                     return KEY_NEXT_GAME_CODE;
+                case ALLEGRO_KEY_R:
+                    return KEY_RESTART_GAME;
                 default:
+                    // Gestion spécifique des touches alphabétiques - Convertir les codes Allegro en caractères ASCII
                     if (event.keyboard.keycode >= ALLEGRO_KEY_A && event.keyboard.keycode <= ALLEGRO_KEY_Z) {
+                        // Pour R/r, retourner KEY_RESTART_GAME
+                        if (event.keyboard.keycode == ALLEGRO_KEY_R) {
+                            return KEY_RESTART_GAME;
+                        }
+                        // Retourne la lettre correspondante en minuscule
                         return 'a' + (event.keyboard.keycode - ALLEGRO_KEY_A);
+                    }
+                    // Pour les touches numériques
+                    else if (event.keyboard.keycode >= ALLEGRO_KEY_0 && event.keyboard.keycode <= ALLEGRO_KEY_9) {
+                        return '0' + (event.keyboard.keycode - ALLEGRO_KEY_0);
+                    }
+                    // Pour les autres touches, renvoyer directement le code Unicode si disponible
+                    else if (event.keyboard.unichar > 0) {
+                        return event.keyboard.unichar;
                     }
                     break;
             }
